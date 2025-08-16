@@ -149,10 +149,6 @@ inline Mesh Process_Mesh(const aiMesh* mesh) {
 
 inline void Mesh_UploadToGPU(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,GraphicsResources& graphics_resources,Mesh& mesh)
 {
-    //indices_length_storage.push_back(_indices.size());
-
-
-
 
     SDL_GPUBufferCreateInfo buffer_create_info{};
     const std::uint32_t vertex_buffer_size = sizeof(Vertex)*mesh.vertices.size();
@@ -236,9 +232,6 @@ inline void Mesh_UploadToGPU(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command
     SDL_ReleaseGPUTransferBuffer(device, ib_transfer_buffer);
     SDL_ReleaseGPUTransferBuffer(device, transfer_buffer);
 
-
-
-    //TODO: Solve mesh naming based on model names. E.g. for each mesh part the key becomes model_name + number from 0-mesh total-1
 }
 
 inline void Process_Node(aiNode* node, const aiScene* scene, std::vector<Mesh>& meshes) {

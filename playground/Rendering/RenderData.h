@@ -30,22 +30,19 @@ struct Mesh {
     std::uint32_t i_buffer_id = INVALID_ID;
     Vertices vertices;
     Indices indices;
-    //std::vector<std::uint32_t> material_id
 };
 
 struct Model {
+    std::uint32_t model_identifier;
     std::vector<Mesh> mesh_storage;
     std::string directory;
-
-    ////void processNode(aiNode *node, const aiScene *scene)
-
 };
 
 struct GraphicsBuffer {
 
     explicit GraphicsBuffer(SDL_GPUBuffer* buffer): gpu_buffer(buffer) {}
 
-    SDL_GPUBuffer* Get_GPUBuffer() const {
+    [[nodiscard]] SDL_GPUBuffer* Get_GPUBuffer() const {
         return gpu_buffer;
     }
 private:
@@ -54,7 +51,9 @@ private:
 
 
 struct GPUTexture {
-    SDL_GPUTexture* Get_GPUTexture() const {
+    explicit GPUTexture(SDL_GPUTexture* texture) : gpu_texture(texture){};
+
+    [[nodiscard]] SDL_GPUTexture* Get_GPUTexture() const {
         return gpu_texture;
     }
 private:
@@ -88,12 +87,11 @@ struct ResourceDeleter {
 
 template <typename T>
     requires IsGPUResource<T>
-struct GPUResourceMap {
+struct GPUResourceMap /// A storage for automatic management of GPU resources, each resource can be accessed via identifiers once uploaded to the GPU and stored within the map.
+{
 
     std::map<std::uint32_t, std::unique_ptr<T,ResourceDeleter<T>>> resources = std::map<std::uint32_t, std::unique_ptr<T,ResourceDeleter<T>>>();
 
-    std::map<std::string, std::uint32_t> name_to_id = std::map<std::string, std::uint32_t>(); // Converted name to internal identifier
-    std::map<std::uint32_t, std::string> id_to_name = std::map<uint32_t, std::string>(); // Converts internal identifier to name
 
     std::queue<std::uint32_t> available_id = std::queue<std::uint32_t>(); // Allows for reuse of identifiers once a resource is removed.
 
@@ -108,29 +106,8 @@ struct GPUResourceMap {
         return resources.at(key).get();
     }
 
-    T* Get_Resource(const std::string &key) // Get the allocated graphics resource by name, returns null if non-existent
+    std::uint32_t Insert_Resource(std::unique_ptr<T, ResourceDeleter<T>> resource) /// Insert GPU resource gives ownership to the map
     {
-        if (!name_to_id.contains(key)) {
-            return nullptr;
-        }
-        if (!resources.contains(name_to_id[key])) {
-            return nullptr;
-        }
-        return resources.at(name_to_id[key]).get();
-    }
-
-    std::uint32_t Get_ResourceID(const std::string &key) // Get the ID of the resource, returns INVALID_ID (max lim of std::uint32_t if non-existent).
-    {
-        if (name_to_id.contains(key)) {
-            return INVALID_ID;
-        }
-        if (!resources.contains(name_to_id[key])) {
-            return INVALID_ID;
-        }
-        return name_to_id[key];
-    }
-
-    std::uint32_t Insert_Resource(std::unique_ptr<T, ResourceDeleter<T>> resource) {
         if (available_id.empty()) {
             const std::uint32_t id = identifier_count;
             resources.insert(std::pair(id, std::move(resource)));
@@ -144,12 +121,12 @@ struct GPUResourceMap {
         resource_count+=1;
         return id;
     }
-    bool Remove_Resource(SDL_GPUDevice* device,const std::string& resource_name) {
-        if (!name_to_id.contains(resource_name)) {
-            SDL_Log(("No resource exists named: " + resource_name).c_str());
+
+    bool Remove_Resource(SDL_GPUDevice* device,const std::int32_t& resource_id) {
+        if (!resources.contains(resource_id)) {
+            SDL_Log(("No resource exists in this slot \n"));
             return false;
         }
-        const std::uint32_t resource_id = name_to_id[resource_name];
 
         if (resources.contains(resource_id)) {
             try {
@@ -158,24 +135,22 @@ struct GPUResourceMap {
                     available_id.push(resource_id);
                     resource_count -=1;
                     resources.erase(resource_id);
-                    std::string name_key = id_to_name[resource_id];
-                    id_to_name.erase(resource_id);
-                    name_to_id.erase(resource_name);
+                    return true;
                 }
                 else if constexpr (std::is_same_v<T, GPUTexture>) {
                     SDL_ReleaseGPUTexture(device, resources[resource_id]->gpu_texture);
                     available_id.push(resource_id);
                     resource_count -=1;
                     resources.erase(resource_id);
-                    id_to_name.erase(resource_id);
-                    name_to_id.erase(resource_name);
+                    return true;
+
                 }
                 else {
                     std::cerr << "Error: Unknown resource type." << std::endl;
                 }
             }
             catch ( const std::runtime_error& e) {
-                std::cerr << "Incorrect type, cannot remove resource " << resource_name <<std::endl;
+                std::cerr << "Incorrect type, cannot remove resource " << std::endl;
             }
         }
         return true;

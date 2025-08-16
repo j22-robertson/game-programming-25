@@ -6,7 +6,8 @@ add_executable(00_hello_world 00_hello_world.c
 add_executable(01_hello_world 01_hello_world.cpp)
 add_executable(02_hello_sdl   02_hello_sdl.cpp)
 add_executable(testing_sdl   ../playground/testing_sdl.cpp
-        ../playground/Rendering/RenderUtils.h)
+        ../playground/Rendering/RenderUtils.h
+        ../playground/Components/CoreComponents.h)
 
 cmake_minimum_required(VERSION 3.11) # FetchContent is new in version 3.11.
 

@@ -16,7 +16,8 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-
+#include "code/AssetLib/glTF2/glTF2Exporter.h"
+#include "Components/CoreComponents.h"
 
 
 struct TestUBO{
@@ -208,8 +209,15 @@ void Update_Camera(CameraUniform& camera_uniform) {
     camera.Update_View(time);
 
     camera_uniform.view = camera.View_Matrix();
+
+    Transform transform{};
+    transform.Rotate(glm::vec3(0.0f, 0.0f, 1.0f),time*90);
+    transform.Get_Scale() = glm::vec3(1.0f, 1.0f, 1.0f);
+    transform.Get_Position() = glm::vec3(time*1.0,1.0,1.0);
     camera_uniform.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
+
+    camera_uniform.model = transform.Get_TransformMatrix();
     camera_uniform.projection = glm::perspective(glm::radians(70.0f), (float)960 / (float)540, 0.1f, 1000.0f);
 
 
@@ -422,12 +430,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     graphics_pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
 
-    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[1];
+    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[2];
 
     vertex_buffer_descriptions[0].slot = 0;
     vertex_buffer_descriptions[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
     vertex_buffer_descriptions[0].instance_step_rate = 0;
     vertex_buffer_descriptions[0].pitch = sizeof(Vertex);
+
+    vertex_buffer_descriptions[1].slot = 1;
+    vertex_buffer_descriptions[1].input_rate = SDL_GPU_VERTEXINPUTRATE_INSTANCE;
+    vertex_buffer_descriptions[1].pitch = sizeof(glm::mat4x4);
+    vertex_buffer_descriptions[1].instance_step_rate= 0;
 
     graphics_pipeline_info.vertex_input_state.num_vertex_buffers = 1;
     graphics_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
@@ -454,6 +467,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     graphics_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
+
     SDL_GPUColorTargetDescription color_target_descriptions[1];
 
     color_target_descriptions[0] = {};
@@ -573,7 +587,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
         SDL_BindGPUVertexBuffers(render_pass,0,buffer_bindings,1);
         SDL_BindGPUIndexBuffer(render_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_16BIT);
-
 
         SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),1,0,0,0);
 
