@@ -16,7 +16,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
-#include "code/AssetLib/glTF2/glTF2Exporter.h"
 #include "Components/CoreComponents.h"
 
 
@@ -44,7 +43,7 @@ struct Camera {
 
     float pitch {0.0f};
     float yaw {0.f};
-    glm::mat4 Rotation_Matrix()
+    glm::mat4 Rotation_Matrix() const
     {
 
         glm::quat pitchRotation = glm::angleAxis(pitch, glm::vec3{ 1.f,0.0f,0.0f });
@@ -56,13 +55,13 @@ struct Camera {
 
     glm::mat4 View_Matrix()
     {
-        glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.0f), position);
-        glm::mat4 cameraRotation = Rotation_Matrix();
+        const glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.0f), position);
+        const glm::mat4 cameraRotation = Rotation_Matrix();
         return glm::inverse(cameraTranslation * cameraRotation);
     }
     void Update_View(float dt)
     {
-        glm::mat4 rot = Rotation_Matrix();
+        const glm::mat4 rot = Rotation_Matrix();
 
         position += glm::vec3(rot * glm::vec4(velocity *  0.005f, 0.0f));
        // SDL_Log(("position x:" + std::to_string(position.x) + "position y:" + std::to_string(position.y)+"position z:" + std::to_string(position.z)+" ").c_str());
@@ -94,6 +93,8 @@ std::vector<std::uint32_t> indices_length_storage;
 
 SDL_GPUBuffer* vertex_buffer;
 SDL_GPUBuffer* index_buffer;
+SDL_GPUBuffer* instance_buffer;
+SDL_GPUTransferBuffer* instance_transfer_buffer;
 
 SDL_GPUTexture* texture;
 SDL_GPUSampler* sampler;
@@ -105,6 +106,8 @@ SDL_GPUTexture* depth_texture;
 
 std::map<std::string, Model> models;
 std::queue<Model> unloaded_models;
+
+std::vector<Transform> transforms;
 
 GraphicsResources graphics_resources;
 
@@ -322,7 +325,100 @@ void Load_GridPipeline(SDL_GPUDevice* device) {
 
 }
 
+void Create_InstanceBuffer(SDL_GPUDevice* device) {
+    SDL_GPUBufferCreateInfo buffer_create_info{};
 
+    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*transforms.size();
+
+    const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+    buffer_create_info.size = instance_buffer_size;
+    buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+    instance_buffer = SDL_CreateGPUBuffer(device, &buffer_create_info);
+
+    SDL_GPUTransferBufferCreateInfo transfer_buffer_info{};
+    transfer_buffer_info.size = instance_buffer_size;
+    transfer_buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    instance_transfer_buffer = SDL_CreateGPUTransferBuffer(device, &transfer_buffer_info);
+
+
+
+    glm::mat4* data = (glm::mat4*)SDL_MapGPUTransferBuffer(device, instance_transfer_buffer, true);
+
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    auto model_matrices = std::vector<glm::mat4>();
+
+    for (auto& transform : transforms) {
+        model_matrices.emplace_back(transform.Get_TransformMatrix());
+    }
+
+    SDL_memcpy(data,model_matrices.data(),instance_buffer_size);
+    SDL_UnmapGPUTransferBuffer(device, instance_transfer_buffer);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    SDL_GPUTransferBufferLocation transfer_location{};
+    transfer_location.transfer_buffer = instance_transfer_buffer;
+    transfer_location.offset = 0;
+
+    SDL_GPUBufferRegion buffer_region{};
+    buffer_region.buffer = instance_buffer;
+    buffer_region.size = instance_buffer_size;
+    buffer_region.offset = 0;
+
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
+  //  SDL_ReleaseGPUTransferBuffer(device,transfer_buffer);
+}
+
+void Update_InstanceBuffer() {
+    //TODO: Change this function to update fixed parts of the instance buffer so that different instances of different models can be rendered with the same binding?
+    //TODO: Make this function work with all transforms that can be rendered within a scene
+
+
+    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*transforms.size();
+
+    const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+
+    glm::mat4* data = (glm::mat4*)SDL_MapGPUTransferBuffer(device, instance_transfer_buffer, true);
+
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    auto model_matrices = std::vector<glm::mat4>();
+
+    for (auto transform : transforms) {
+        model_matrices.emplace_back(transform.Get_TransformMatrix());
+    }
+
+    SDL_memcpy(data,model_matrices.data(),instance_buffer_size);
+    SDL_UnmapGPUTransferBuffer(device, instance_transfer_buffer);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    SDL_GPUTransferBufferLocation transfer_location{};
+    transfer_location.transfer_buffer = instance_transfer_buffer;
+    transfer_location.offset = 0;
+
+    SDL_GPUBufferRegion buffer_region{};
+    buffer_region.buffer = instance_buffer;
+    buffer_region.size = instance_buffer_size;
+    buffer_region.offset = 0;
+
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
+}
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
@@ -440,12 +536,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     vertex_buffer_descriptions[1].slot = 1;
     vertex_buffer_descriptions[1].input_rate = SDL_GPU_VERTEXINPUTRATE_INSTANCE;
     vertex_buffer_descriptions[1].pitch = sizeof(glm::mat4x4);
-    vertex_buffer_descriptions[1].instance_step_rate= 0;
+    vertex_buffer_descriptions[1].instance_step_rate= 1;
 
-    graphics_pipeline_info.vertex_input_state.num_vertex_buffers = 1;
+    graphics_pipeline_info.vertex_input_state.num_vertex_buffers = 2;
     graphics_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
 
-    SDL_GPUVertexAttribute vertex_attributes[3];
+    SDL_GPUVertexAttribute vertex_attributes[7];
 
     vertex_attributes[0].buffer_slot=0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
@@ -461,9 +557,29 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
     vertex_attributes[2].location = 2;
     vertex_attributes[2].offset = sizeof(float)*6;
-    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=3;
+
+    vertex_attributes[3].buffer_slot = 1;
+    vertex_attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[3].location = 3;
+    vertex_attributes[3].offset = 0;
+
+    vertex_attributes[4].buffer_slot = 1;
+    vertex_attributes[4].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[4].location = 4;
+    vertex_attributes[4].offset =sizeof(float)*4;
+
+    vertex_attributes[5].buffer_slot = 1;
+    vertex_attributes[5].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[5].location = 5;
+    vertex_attributes[5].offset = sizeof(float)*8;
+
+    vertex_attributes[6].buffer_slot = 1;
+    vertex_attributes[6].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[6].location = 6;
+    vertex_attributes[6].offset = sizeof(float)*12;
+
+    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=7;
     graphics_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
-    //graphics_pipeline_info.
 
     graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     graphics_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
@@ -487,6 +603,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
     graphics_pipeline = SDL_CreateGPUGraphicsPipeline(device,&graphics_pipeline_info);
+
+    Transform transform{};
+    transform.Get_Scale()= glm::vec3(1.0,1.0,1.0);
+    transform.Get_Position() = glm::vec3(0.0,0.0,0.0);
+    transforms.push_back(transform);
+    Create_InstanceBuffer(device);
 
     SDL_ReleaseGPUShader(device, vertex_shader);
     SDL_ReleaseGPUShader(device, fragment_shader);
@@ -555,6 +677,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_BindGPUGraphicsPipeline(render_pass,grid_pipeline);
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
+    //SDL_PushGPUVertexUniformData()
 
     SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
 
@@ -573,19 +696,25 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     sim_time.time = SDL_GetTicksNS()/1e9f;
 
+    auto move = glm::vec3(sim_time.time*1.0,0.0,0.0);
+    transforms.front().Translate(move);
+    Update_InstanceBuffer();
+
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
     for (const auto& mesh : models["CUBE"].mesh_storage) {
-        SDL_GPUBufferBinding buffer_bindings[1];
+        SDL_GPUBufferBinding buffer_bindings[2];
 
         buffer_bindings[0].buffer = graphics_resources.vertex_buffer_map.Get_Resource(mesh.v_buffer_id)->Get_GPUBuffer();
         buffer_bindings[0].offset = 0;
+        buffer_bindings[1].buffer = instance_buffer;
+        buffer_bindings[1].offset = 0;
 
         SDL_GPUBufferBinding ib_buffer_bindings[1];
         ib_buffer_bindings[0].buffer = graphics_resources.index_buffer_map.Get_Resource(mesh.i_buffer_id)->Get_GPUBuffer();
         ib_buffer_bindings[0].offset=0;
 
 
-        SDL_BindGPUVertexBuffers(render_pass,0,buffer_bindings,1);
+        SDL_BindGPUVertexBuffers(render_pass,0,buffer_bindings,2);
         SDL_BindGPUIndexBuffer(render_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
         SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),1,0,0,0);
@@ -677,6 +806,10 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     SDL_ReleaseGPUShader(device, grid_vertex_shader);
     SDL_ReleaseGPUShader(device, grid_fragment_shader);
+
+    SDL_ReleaseGPUBuffer(device,instance_buffer);
+
+    SDL_ReleaseGPUTransferBuffer(device,instance_transfer_buffer);
 
     for (auto buffer : vertex_buffer_storage) {
         SDL_ReleaseGPUBuffer(device, buffer);

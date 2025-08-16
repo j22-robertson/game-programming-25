@@ -161,6 +161,7 @@ struct GPUResourceMap /// A storage for automatic management of GPU resources, e
 struct GraphicsResources {
     GPUResourceMap<GraphicsBuffer> vertex_buffer_map;
     GPUResourceMap<GraphicsBuffer> index_buffer_map;
+    GPUResourceMap<GPUTexture> texture_map;
 };
 
 
