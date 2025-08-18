@@ -445,23 +445,25 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
    // Mesh_UploadToGPU(device, cube_vertices,cube_indices);
 
-
-
-    Model model = Load_ModelDataFromFile(device, "C:/Users/James Robertson/CLionProjects/game-programming-25/playground/Models/Dragon 2.5_fbx.fbx");
-
-    unloaded_models.push(model);
-
     SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
+    std::map<std::string, std::unique_ptr<Texture2D>> texture_map;
+    Model model = Load_ModelDataFromFile(device,
+        command_buffer ,
+        "C:/Users/James Robertson/CLionProjects/game-programming-25/playground/Models/ornate_mirror/scene.gltf",
+        graphics_resources);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 
+    models.insert(std::pair("CUBE",model));
+/*
     while (!unloaded_models.empty()) {
         auto unloaded_model = unloaded_models.front();
         for (auto& mesh : unloaded_model.mesh_storage) {
-            Mesh_UploadToGPU(device,command_buffer,graphics_resources,mesh);
+           // Mesh_UploadToGPU(device,command_buffer,graphics_resources,mesh);
         }
         unloaded_models.pop();
         models.insert(std::pair("CUBE",unloaded_model));
-    }
-    SDL_SubmitGPUCommandBuffer(command_buffer);
+    }*/
+
 
 
     Load_Texture2DFromFile(device,"C:/Users/James Robertson/CLionProjects/game-programming-25/playground/Textures/red-clay-wall-albedo.png" );
@@ -697,7 +699,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     sim_time.time = SDL_GetTicksNS()/1e9f;
 
     auto move = glm::vec3(sim_time.time*1.0,0.0,0.0);
-    transforms.front().Translate(move);
+    //transforms.front().Translate(move);
     Update_InstanceBuffer();
 
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
@@ -819,6 +821,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     }
     graphics_resources.vertex_buffer_map.resources.clear();
     graphics_resources.index_buffer_map.resources.clear();
+    graphics_resources.texture_map.resources.clear();
+
     SDL_ReleaseGPUBuffer(device, index_buffer);
     SDL_ReleaseGPUBuffer(device,vertex_buffer);
     SDL_ReleaseGPUSampler(device,sampler);
