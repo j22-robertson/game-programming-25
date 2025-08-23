@@ -129,7 +129,7 @@ int mesh_count = 0;
 void Load_Texture2DFromFile(SDL_GPUDevice* device, const std::string& filename) {
 
     int width, height, channels;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 0);
+    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 4);
     if (data == nullptr) {
         SDL_Log(("Unable to load texture: "+filename + "\n").c_str());
         return;
@@ -465,8 +465,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
 
-    Load_Texture2DFromFile(device,"../playground/Textures/red-clay-wall-albedo.png" );
+    //Load_Texture2DFromFile(device,"../playground/Textures/red-clay-wall-albedo.png" );
 
+    Load_Texture2DFromFile(device,"../playground/Models/ornate_mirror/textures/Mirror_material_baseColor.jpeg" );
     size_t vertex_shader_size = 0;
     void* vertex_code = SDL_LoadFile("../playground/shaders/vertex.spv", &vertex_shader_size);
 
@@ -510,7 +511,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     fragment_shader_info.entrypoint = "main";
     fragment_shader_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
     fragment_shader_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-    fragment_shader_info.num_samplers = 1;
+    fragment_shader_info.num_samplers = 4;
     fragment_shader_info.num_storage_buffers = 0;
     fragment_shader_info.num_storage_textures = 0;
     fragment_shader_info.num_uniform_buffers = 1;
@@ -685,12 +686,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 
     SDL_BindGPUGraphicsPipeline(render_pass,graphics_pipeline);
-
+/*
     SDL_GPUTextureSamplerBinding texture_sampler_binding[1]{};
     texture_sampler_binding[0].sampler = sampler;
     texture_sampler_binding[0].texture = texture;
+*/
 
-    SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,1);
 
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
 
@@ -703,6 +704,21 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
     for (const auto& mesh : models["CUBE"].mesh_storage) {
+        SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
+        texture_sampler_binding[0].sampler = sampler;
+        texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(mesh.material.albedo)->Get_GPUTexture();
+        texture_sampler_binding[1].sampler = sampler;
+        texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(mesh.material.normal)->Get_GPUTexture();
+
+        texture_sampler_binding[2].sampler = sampler;
+        texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(mesh.material.roughness)->Get_GPUTexture();
+
+        texture_sampler_binding[3].sampler = sampler;
+        texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(mesh.material.metallic)->Get_GPUTexture();
+
+
+
+        SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
         SDL_GPUBufferBinding buffer_bindings[2];
 
         buffer_bindings[0].buffer = graphics_resources.vertex_buffer_map.Get_Resource(mesh.v_buffer_id)->Get_GPUBuffer();

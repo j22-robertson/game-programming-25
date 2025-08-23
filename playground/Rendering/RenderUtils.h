@@ -20,15 +20,17 @@
  * the file names could be useful for serialization of scenes later on allowing for an editor
  * and automatic loading of all files (models, textures and other assets) for scenes.
 **/
-std::uint32_t Load_Texture2DFromFile(SDL_GPUDevice* device,GraphicsResources& resources, const std::string& filename) {
-
-
+inline std::uint32_t Upload_Texture2DFromFile(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,GraphicsResources& resources, const std::string& filename) {
+    if (resources.texture_map.Contains(resources.texture_map.Get_ID(filename))) {
+        return resources.texture_map.Get_ID(filename);
+    }
     int width, height, channels;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 0);
+    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 4);
     if (data == nullptr) {
         SDL_Log(("Unable to load texture: "+filename + "\n").c_str());
         return INVALID_ID;
     }
+
 
     SDL_GPUTextureCreateInfo texture_info{};
 
@@ -37,18 +39,18 @@ std::uint32_t Load_Texture2DFromFile(SDL_GPUDevice* device,GraphicsResources& re
     texture_info.layer_count_or_depth = 1;
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
     texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    //texture_info.format = SDL_GPU_TEXTUREFO
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     texture_info.num_levels = 1;
 
-   // auto* texture = SDL_CreateGPUTexture(device, &texture_info);
-    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texture_info);
+    auto* texture = SDL_CreateGPUTexture(device, &texture_info);
+    //SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texture_info);
 
     SDL_GPUTransferBufferCreateInfo buffer_info{};
     buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    buffer_info.size = static_cast<std::uint32_t>(channels * width * height);
+    buffer_info.size = static_cast<std::uint32_t>(4* width * height);
     buffer_info.props = 0;
 
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
 
 
 
@@ -78,7 +80,7 @@ std::uint32_t Load_Texture2DFromFile(SDL_GPUDevice* device,GraphicsResources& re
     texture_region.y=0;
     texture_region.z=0;
 
-    void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,true);
+    void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,false);
 
     SDL_memcpy(mapped_data, data, (channels*width*height));
 
@@ -89,15 +91,15 @@ std::uint32_t Load_Texture2DFromFile(SDL_GPUDevice* device,GraphicsResources& re
 
 
     SDL_EndGPUCopyPass(image_copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
     SDL_ReleaseGPUTransferBuffer(device,transfer_buffer);
 
 
-    return resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),filename);
-
+   return resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),filename);
+    return INVALID_ID;
 
 
 }
+
 inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const aiMaterial* material, const aiTextureType type, const std::string& type_name, GraphicsResources& resources) {
     std::vector<std::uint32_t> texture_identifiers;
     for (int i = 0; i < aiGetMaterialTextureCount(material, type); i++) {
@@ -105,18 +107,12 @@ inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SD
         material->GetTexture(type, i, &str);
 
         Texture2D texture;
-        /*
-        if (.contains(str.C_Str())) {
-            return;
-        }*/
+
         texture.texture_type = type_name;
         texture.file_path = str.C_Str();
 
-        if (resources.texture_map.Contains(resources.texture_map.Get_ID("../playground/Models/ornate_mirror/"+texture.file_path))) {
-            continue;
-        }
 
-        auto texture_id = Load_Texture2DFromFile(device, resources, "../playground/Models/ornate_mirror/"+texture.file_path);
+        auto texture_id = Upload_Texture2DFromFile(device, command_buffer,resources, "../playground/Models/ornate_mirror/"+texture.file_path);
         texture_identifiers.push_back(texture_id);
     }
     return texture_identifiers;
@@ -265,18 +261,20 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
 
         auto& mesh_to_load = meshes.emplace_back(Process_Mesh(mesh, scene, resources));
         if (mesh->mMaterialIndex>=0) {
-            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+            const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
             auto base_colors =Load_MaterialTextures(device,command_buffer,material, aiTextureType_BASE_COLOR,"base_color_texture",resources);
             auto normal_textures=Load_MaterialTextures(device,command_buffer,material, aiTextureType_NORMALS,"normal_texture",resources);
             auto roughness_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_DIFFUSE_ROUGHNESS,"roughness_texture",resources);
             auto metallic_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_METALNESS,"metallic_texture",resources);
-            auto ao_textures = Load_MaterialTextures(device,command_buffer,material, aiTextureType_AMBIENT_OCCLUSION,"ao_texture",resources);
-            mesh_to_load.material.albedo=base_colors.front();;
-            mesh_to_load.material.normal=normal_textures.front();;
-            mesh_to_load.material.roughness=roughness_textures.front();;
-            mesh_to_load.material.metallic=metallic_textures.front();;
-            mesh_to_load.material.ao=ao_textures.front();;
+            //auto ao_textures = Load_MaterialTextures(device,command_buffer,material, aiTextureType_AMBIENT_OCCLUSION,"ao_texture",resources);
+
+            mesh_to_load.material.albedo=base_colors.front();
+            mesh_to_load.material.normal=normal_textures.front();
+            mesh_to_load.material.roughness=roughness_textures.front();
+            mesh_to_load.material.metallic=metallic_textures.front();
+            //mesh_to_load.material.ao=INVALID_ID;
+
         }
 
         std::string node_name =node->mName.C_Str();
