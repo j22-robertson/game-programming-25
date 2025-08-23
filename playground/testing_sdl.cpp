@@ -18,7 +18,7 @@
 #include "Components/CoreComponents.h"
 
 
-// TODO:
+// TODO: Add light uniform buffers, light types and a new pipeline for debugging lights
 struct TestUBO{
     glm::vec4 color;
 };
@@ -618,8 +618,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     Transform transform{};
     transform.Get_Scale()= glm::vec3(1.0,1.0,1.0);
-    transform.Get_Position() = glm::vec3(0.0,0.0,0.0);
+    transform.Get_Position() = glm::vec3(3.0,0.0,3.0);
+
+    Transform test_transform{};
+    test_transform.Get_Scale()= glm::vec3(2.0,2.0,2.0);
+    test_transform.Get_Position()= glm::vec3(6.0,0.0,6.0);
     transforms.push_back(transform);
+    transforms.push_back(test_transform);
     Create_InstanceBuffer(device);
 
     SDL_ReleaseGPUShader(device, vertex_shader);
@@ -744,7 +749,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_BindGPUVertexBuffers(render_pass,0,buffer_bindings,2);
         SDL_BindGPUIndexBuffer(render_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_16BIT);
 
-        SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),1,0,0,0);
+        SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),transforms.size(),0,0,0);
 
     }
 
