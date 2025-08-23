@@ -2,7 +2,8 @@
 
 layout(std140, set=1,binding=0) uniform UniformBufferObject
 {
-	mat4 model;
+    vec3 view_position;
+    float padding;
 	mat4 view;
 	mat4 projection;
 } view;

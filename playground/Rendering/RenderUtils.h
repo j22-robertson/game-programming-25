@@ -39,7 +39,6 @@ inline std::uint32_t Upload_Texture2DFromFile(SDL_GPUDevice* device,SDL_GPUComma
     texture_info.layer_count_or_depth = 1;
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
     texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    //texture_info.format = SDL_GPU_TEXTUREFO
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     texture_info.num_levels = 1;
 
@@ -142,6 +141,26 @@ inline Mesh Process_Mesh(const aiMesh* mesh, const aiScene* scene,GraphicsResour
         else {
             vertex.u=(float)(mesh->mVertices[i].x*0.5 +0.5);
             vertex.v=(float)(mesh->mVertices[i].y*0.5 +0.5);
+        }
+        if (mesh->mTangents != nullptr) {
+            vertex.tx = mesh->mTangents[i].x;
+            vertex.ty = mesh->mTangents[i].y;
+            vertex.tz = mesh->mTangents[i].z;
+        }
+        else {
+            vertex.tx=0.0;
+            vertex.ty=0.0;
+            vertex.tz=0.0;
+        }
+        if (mesh->mBitangents != nullptr) {
+            vertex.btx = mesh->mBitangents[i].x;
+            vertex.bty = mesh->mBitangents[i].y;
+            vertex.btz = mesh->mBitangents[i].z;
+        }
+        else {
+            vertex.btx=0.0;
+            vertex.bty=0.0;
+            vertex.btz=0.0;
         }
         loaded_mesh.vertices.push_back(vertex);
     }
@@ -289,7 +308,7 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
 inline Model Load_ModelDataFromFile(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const std::string& filename,GraphicsResources& resources) {
     std::vector<Mesh> loaded_meshes;
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_SplitLargeMeshes);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs |aiProcess_CalcTangentSpace| aiProcess_SplitLargeMeshes);
     auto& node = scene->mRootNode;
     std::uint32_t mesh_count = 0;
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !node){

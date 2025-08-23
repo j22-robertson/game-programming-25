@@ -28,7 +28,8 @@ struct TimeStep {
 };
 
 struct CameraUniform {
-    glm::mat4 model;
+    glm::vec3 position;
+    float padding = 0.0;
     glm::mat4 view;
     glm::mat4 projection;
 };
@@ -216,10 +217,8 @@ void Update_Camera(CameraUniform& camera_uniform) {
     transform.Rotate(glm::vec3(0.0f, 0.0f, 1.0f),time*90);
     transform.Get_Scale() = glm::vec3(1.0f, 1.0f, 1.0f);
     transform.Get_Position() = glm::vec3(time*1.0,1.0,1.0);
-    camera_uniform.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-
-    camera_uniform.model = transform.Get_TransformMatrix();
+    camera_uniform.position = camera.position;
     camera_uniform.projection = glm::perspective(glm::radians(70.0f), (float)960 / (float)540, 0.1f, 1000.0f);
 
 
@@ -543,7 +542,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     graphics_pipeline_info.vertex_input_state.num_vertex_buffers = 2;
     graphics_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
 
-    SDL_GPUVertexAttribute vertex_attributes[7];
+    SDL_GPUVertexAttribute vertex_attributes[9];
 
     vertex_attributes[0].buffer_slot=0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
@@ -560,30 +559,40 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     vertex_attributes[2].location = 2;
     vertex_attributes[2].offset = sizeof(float)*6;
 
-    vertex_attributes[3].buffer_slot = 1;
-    vertex_attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[3].buffer_slot=0;
+    vertex_attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[3].location = 3;
-    vertex_attributes[3].offset = 0;
+    vertex_attributes[3].offset = sizeof(float)*8;
 
-    vertex_attributes[4].buffer_slot = 1;
-    vertex_attributes[4].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[4].buffer_slot=0;
+    vertex_attributes[4].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[4].location = 4;
-    vertex_attributes[4].offset =sizeof(float)*4;
+    vertex_attributes[4].offset = sizeof(float)*11;
 
     vertex_attributes[5].buffer_slot = 1;
     vertex_attributes[5].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
     vertex_attributes[5].location = 5;
-    vertex_attributes[5].offset = sizeof(float)*8;
+    vertex_attributes[5].offset = 0;
 
     vertex_attributes[6].buffer_slot = 1;
     vertex_attributes[6].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
     vertex_attributes[6].location = 6;
-    vertex_attributes[6].offset = sizeof(float)*12;
+    vertex_attributes[6].offset =sizeof(float)*4;
 
-    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=7;
+    vertex_attributes[7].buffer_slot = 1;
+    vertex_attributes[7].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[7].location = 7;
+    vertex_attributes[7].offset = sizeof(float)*8;
+
+    vertex_attributes[8].buffer_slot = 1;
+    vertex_attributes[8].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
+    vertex_attributes[8].location = 8;
+    vertex_attributes[8].offset = sizeof(float)*12;
+
+    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=9;
     graphics_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
 
-    graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     graphics_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[1];
