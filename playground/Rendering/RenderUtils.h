@@ -4,7 +4,6 @@
 
 #ifndef GP25_EXERCISES_RENDERUTILS_H
 #define GP25_EXERCISES_RENDERUTILS_H
-#include <cstdint>
 #include <vector>
 
 #include "SDL3/SDL_gpu.h"
@@ -13,11 +12,94 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "code/AssetLib/3MF/3MFXmlTags.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+// TODO: Look into the advantages and disadvantages of batching uploads to the GPU in a single transfer buffer for each batch of uploads.
+/** TODO: Look into the separation of file loading and uploading, a resourceloader that stores
+ * the file names could be useful for serialization of scenes later on allowing for an editor
+ * and automatic loading of all files (models, textures and other assets) for scenes.
+**/
+std::uint32_t Load_Texture2DFromFile(SDL_GPUDevice* device,GraphicsResources& resources, const std::string& filename) {
 
 
-inline void Load_MaterialTextures(const aiMaterial* material, const aiTextureType type, const std::string& type_name, GraphicsResources& resources) {
+    int width, height, channels;
+    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &channels, 0);
+    if (data == nullptr) {
+        SDL_Log(("Unable to load texture: "+filename + "\n").c_str());
+        return INVALID_ID;
+    }
 
+    SDL_GPUTextureCreateInfo texture_info{};
+
+    texture_info.width = width;
+    texture_info.height = height;
+    texture_info.layer_count_or_depth = 1;
+    texture_info.type = SDL_GPU_TEXTURETYPE_2D;
+    texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    texture_info.num_levels = 1;
+
+   // auto* texture = SDL_CreateGPUTexture(device, &texture_info);
+    SDL_GPUTexture* texture = SDL_CreateGPUTexture(device, &texture_info);
+
+    SDL_GPUTransferBufferCreateInfo buffer_info{};
+    buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    buffer_info.size = static_cast<std::uint32_t>(channels * width * height);
+    buffer_info.props = 0;
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+
+
+    SDL_GPUCopyPass* image_copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+
+    auto* transfer_buffer = SDL_CreateGPUTransferBuffer(device, &buffer_info);
+
+
+
+
+    SDL_GPUTextureTransferInfo transfer_info{};
+    transfer_info.transfer_buffer = transfer_buffer;
+    transfer_info.pixels_per_row = width;
+    transfer_info.offset = 0;
+    transfer_info.rows_per_layer = 1;
+
+
+    SDL_GPUTextureRegion texture_region{};
+    texture_region.texture = texture;
+    texture_region.d = 0;
+    texture_region.h = height;
+    texture_region.w = width;
+    texture_region.layer = 0;
+    texture_region.mip_level = 0;
+    texture_region.x=0;
+    texture_region.y=0;
+    texture_region.z=0;
+
+    void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,true);
+
+    SDL_memcpy(mapped_data, data, (channels*width*height));
+
+    SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
+
+
+    SDL_UploadToGPUTexture(image_copy_pass,&transfer_info,&texture_region, true);
+
+
+    SDL_EndGPUCopyPass(image_copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+    SDL_ReleaseGPUTransferBuffer(device,transfer_buffer);
+
+
+    return resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),filename);
+
+
+
+}
+inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const aiMaterial* material, const aiTextureType type, const std::string& type_name, GraphicsResources& resources) {
+    std::vector<std::uint32_t> texture_identifiers;
     for (int i = 0; i < aiGetMaterialTextureCount(material, type); i++) {
         aiString str;
         material->GetTexture(type, i, &str);
@@ -29,7 +111,15 @@ inline void Load_MaterialTextures(const aiMaterial* material, const aiTextureTyp
         }*/
         texture.texture_type = type_name;
         texture.file_path = str.C_Str();
+
+        if (resources.texture_map.Contains(resources.texture_map.Get_ID("../playground/Models/ornate_mirror/"+texture.file_path))) {
+            continue;
+        }
+
+        auto texture_id = Load_Texture2DFromFile(device, resources, "../playground/Models/ornate_mirror/"+texture.file_path);
+        texture_identifiers.push_back(texture_id);
     }
+    return texture_identifiers;
 }
 
 inline Mesh Process_Mesh(const aiMesh* mesh, const aiScene* scene,GraphicsResources& resources) {
@@ -61,7 +151,7 @@ inline Mesh Process_Mesh(const aiMesh* mesh, const aiScene* scene,GraphicsResour
     }
 
     for (int i =0; i < mesh->mNumFaces; i++) {
-        aiFace face = mesh->mFaces[i];
+        const aiFace face = mesh->mFaces[i];
         for (int j = 0; j < face.mNumIndices; j++) {
             loaded_mesh.indices.push_back(face.mIndices[j]);
         }
@@ -169,18 +259,26 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
         std::uint32_t mesh_index = node->mMeshes[i];
         aiMesh* mesh = scene->mMeshes[mesh_index];
 
-        if (mesh->mMaterialIndex>=0) {
-            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-            Load_MaterialTextures(material, aiTextureType_BASE_COLOR,"base_color_texture",resources);
-            Load_MaterialTextures(material, aiTextureType_NORMALS,"normal_texture",resources);
-            Load_MaterialTextures(material, aiTextureType_DIFFUSE_ROUGHNESS,"roughness_texture",resources);
-            Load_MaterialTextures(material, aiTextureType_METALNESS,"metallic_texture",resources);
-            Load_MaterialTextures(material, aiTextureType_AMBIENT_OCCLUSION,"ao_texture",resources);
-        }
+
 
 
         auto& mesh_to_load = meshes.emplace_back(Process_Mesh(mesh, scene, resources));
+        if (mesh->mMaterialIndex>=0) {
+            aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+            auto base_colors =Load_MaterialTextures(device,command_buffer,material, aiTextureType_BASE_COLOR,"base_color_texture",resources);
+            auto normal_textures=Load_MaterialTextures(device,command_buffer,material, aiTextureType_NORMALS,"normal_texture",resources);
+            auto roughness_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_DIFFUSE_ROUGHNESS,"roughness_texture",resources);
+            auto metallic_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_METALNESS,"metallic_texture",resources);
+            auto ao_textures = Load_MaterialTextures(device,command_buffer,material, aiTextureType_AMBIENT_OCCLUSION,"ao_texture",resources);
+            mesh_to_load.material.albedo=base_colors.front();;
+            mesh_to_load.material.normal=normal_textures.front();;
+            mesh_to_load.material.roughness=roughness_textures.front();;
+            mesh_to_load.material.metallic=metallic_textures.front();;
+            mesh_to_load.material.ao=ao_textures.front();;
+        }
+
         std::string node_name =node->mName.C_Str();
         Mesh_UploadToGPU(device, command_buffer, resources, mesh_to_load, mesh->mName.C_Str()+node_name+std::to_string(i)+std::to_string(step_count));
     }

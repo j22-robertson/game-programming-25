@@ -14,8 +14,7 @@
 #include "Rendering/RenderUtils.h"
 
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+
 #include "Components/CoreComponents.h"
 
 
