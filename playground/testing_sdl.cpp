@@ -233,7 +233,7 @@ void Update_Camera(CameraUniform& camera_uniform) {
 void Load_GridShaders(SDL_GPUDevice* device) {
 
     size_t vertex_shader_size = 0;
-    void* vertex_code = SDL_LoadFile("C:/Users/James Robertson/CLionProjects/game-programming-25/playground/shaders/grid_vertex.spv", &vertex_shader_size);
+    void* vertex_code = SDL_LoadFile("../playground/shaders/grid_vertex.spv", &vertex_shader_size);
 
     SDL_GPUShaderCreateInfo vertex_shader_info{};
     vertex_shader_info.code = (Uint8*)vertex_code; //convert to an array of bytes
@@ -252,7 +252,7 @@ void Load_GridShaders(SDL_GPUDevice* device) {
 
 
     size_t fragment_shader_size = 0;
-    void* fragment_code = SDL_LoadFile("C:/Users/James Robertson/CLionProjects/game-programming-25/playground/shaders/grid_fragment.spv",&fragment_shader_size);
+    void* fragment_code = SDL_LoadFile("../playground/shaders/grid_fragment.spv",&fragment_shader_size);
 
     SDL_GPUShaderCreateInfo fragment_shader_info{};
     fragment_shader_info.code = (Uint8*)fragment_code;
@@ -449,7 +449,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     std::map<std::string, std::unique_ptr<Texture2D>> texture_map;
     Model model = Load_ModelDataFromFile(device,
         command_buffer ,
-        "C:/Users/James Robertson/CLionProjects/game-programming-25/playground/Models/ornate_mirror/scene.gltf",
+        "../playground/Models/ornate_mirror/scene.gltf",
         graphics_resources);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
@@ -466,10 +466,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
 
-    Load_Texture2DFromFile(device,"C:/Users/James Robertson/CLionProjects/game-programming-25/playground/Textures/red-clay-wall-albedo.png" );
+    Load_Texture2DFromFile(device,"../playground/Textures/red-clay-wall-albedo.png" );
 
     size_t vertex_shader_size = 0;
-    void* vertex_code = SDL_LoadFile("C:/Users/James Robertson/CLionProjects/game-programming-25/playground/shaders/vertex.spv", &vertex_shader_size);
+    void* vertex_code = SDL_LoadFile("../playground/shaders/vertex.spv", &vertex_shader_size);
 
     SDL_GPUShaderCreateInfo vertex_shader_info{};
     vertex_shader_info.code = (Uint8*)vertex_code; //convert to an array of bytes
@@ -486,7 +486,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     SDL_free(vertex_code);
 
     size_t fragment_shader_size = 0;
-    void* fragment_code = SDL_LoadFile("C:/Users/James Robertson/CLionProjects/game-programming-25/playground/shaders/fragment.spv",&fragment_shader_size);
+    void* fragment_code = SDL_LoadFile("../playground/shaders/fragment.spv",&fragment_shader_size);
 
     SDL_GPUSamplerCreateInfo  sampler_create_info{};
 
