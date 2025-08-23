@@ -94,13 +94,13 @@ inline std::uint32_t Upload_Texture2DFromFile(SDL_GPUDevice* device,SDL_GPUComma
 
 
    return resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),filename);
-    return INVALID_ID;
 
 
 }
 
-inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const aiMaterial* material, const aiTextureType type, const std::string& type_name, GraphicsResources& resources) {
+inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const aiMaterial* material, const aiTextureType type, const std::string& type_name, GraphicsResources& resources,const std::string& directory) {
     std::vector<std::uint32_t> texture_identifiers;
+
     for (int i = 0; i < aiGetMaterialTextureCount(material, type); i++) {
         aiString str;
         material->GetTexture(type, i, &str);
@@ -111,7 +111,7 @@ inline std::vector<std::uint32_t> Load_MaterialTextures(SDL_GPUDevice* device,SD
         texture.file_path = str.C_Str();
 
 
-        auto texture_id = Upload_Texture2DFromFile(device, command_buffer,resources, "../playground/Models/ornate_mirror/"+texture.file_path);
+        auto texture_id = Upload_Texture2DFromFile(device, command_buffer,resources, directory +"/"+texture.file_path);
         texture_identifiers.push_back(texture_id);
     }
     return texture_identifiers;
@@ -269,7 +269,7 @@ inline void Mesh_UploadToGPU(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command
 
 }
 
-inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_buffer,aiNode* node, const aiScene* scene, std::vector<Mesh>& meshes, GraphicsResources& resources,std::uint32_t& step_count) {
+inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_buffer,const std::string& directory,aiNode* node, const aiScene* scene, std::vector<Mesh>& meshes, GraphicsResources& resources,std::uint32_t& step_count) {
     for (int i = 0; i < node->mNumMeshes; i++) {
         std::uint32_t mesh_index = node->mMeshes[i];
         aiMesh* mesh = scene->mMeshes[mesh_index];
@@ -282,10 +282,10 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
         if (mesh->mMaterialIndex>=0) {
             const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-            auto base_colors =Load_MaterialTextures(device,command_buffer,material, aiTextureType_BASE_COLOR,"base_color_texture",resources);
-            auto normal_textures=Load_MaterialTextures(device,command_buffer,material, aiTextureType_NORMALS,"normal_texture",resources);
-            auto roughness_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_DIFFUSE_ROUGHNESS,"roughness_texture",resources);
-            auto metallic_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_METALNESS,"metallic_texture",resources);
+            auto base_colors =Load_MaterialTextures(device,command_buffer,material, aiTextureType_BASE_COLOR,"base_color_texture",resources,directory);
+            auto normal_textures=Load_MaterialTextures(device,command_buffer,material, aiTextureType_NORMALS,"normal_texture",resources,directory);
+            auto roughness_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_DIFFUSE_ROUGHNESS,"roughness_texture",resources,directory);
+            auto metallic_textures =Load_MaterialTextures(device,command_buffer,material, aiTextureType_METALNESS,"metallic_texture",resources,directory);
             //auto ao_textures = Load_MaterialTextures(device,command_buffer,material, aiTextureType_AMBIENT_OCCLUSION,"ao_texture",resources);
 
             mesh_to_load.material.albedo=base_colors.front();
@@ -301,7 +301,7 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
     }
     step_count+=1;
     for (int i = 0; i < node->mNumChildren; i++) {
-        Process_Node(device, command_buffer,node->mChildren[i], scene, meshes,resources ,step_count);
+        Process_Node(device, command_buffer,directory,node->mChildren[i], scene, meshes,resources ,step_count);
     }
 }
 
@@ -309,16 +309,18 @@ inline Model Load_ModelDataFromFile(SDL_GPUDevice* device,SDL_GPUCommandBuffer* 
     std::vector<Mesh> loaded_meshes;
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs |aiProcess_CalcTangentSpace| aiProcess_SplitLargeMeshes);
+
+
     auto& node = scene->mRootNode;
     std::uint32_t mesh_count = 0;
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !node){
         SDL_Log(std::string("ERROR::ASIMP::").append(importer.GetErrorString()).c_str());
     }
 
-
+    std::string directory = filename.substr(0, filename.find_last_of("/"));
     //TODO: Load material data into material structures stored in global material map with identifiers. Give mesh the material indices.
     std::uint32_t step_count=0;
-    Process_Node(device,command_buffer,node, scene, loaded_meshes,resources,step_count);
+    Process_Node(device,command_buffer,directory,node, scene, loaded_meshes,resources,step_count);
 
     Model loaded_model{.mesh_storage = loaded_meshes};
     return loaded_model;
