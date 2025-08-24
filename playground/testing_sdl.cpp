@@ -71,17 +71,16 @@ struct Camera {
 
 
 /***
- *TODO: Load textures
- *  - Load texture from file into data
- *  - Create a transfer buffer
- *  - Memcpy the data to the GPU buffer
- *TODO: Bind textures
+ *TODO: Deferred rendering
  *TODO: PBR lighting
  */
 
 
 
-
+std::uint32_t GBUFFER_POSITION;
+std::uint32_t GBUFFER_ALBEDO;
+std::uint32_t GBUFFER_NORMAL;
+std::uint32_t GBUFFER_METALLICROUGHNESS;
 
 SDL_Window* window = nullptr;
 SDL_GPUDevice* device = nullptr;
@@ -202,6 +201,102 @@ void Load_Texture2DFromFile(SDL_GPUDevice* device, const std::string& filename) 
 
 
 }
+
+
+
+std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
+
+    int width, height, channels;
+
+    width = 960;
+    height = 540;
+
+    SDL_GPUTextureCreateInfo texture_info{};
+    std::vector<glm::vec4> texture_data;
+    auto texture_size = width*height;
+    for (int i = 0; i < texture_size; i++) {
+        texture_data.push_back(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    }
+
+
+    texture_info.width = width;
+    texture_info.height = height;
+    texture_info.layer_count_or_depth = 1;
+    texture_info.type = SDL_GPU_TEXTURETYPE_2D;
+    texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    texture_info.num_levels = 1;
+
+   // auto* texture = SDL_CreateGPUTexture(device, &texture_info);
+    texture = SDL_CreateGPUTexture(device, &texture_info);
+
+    SDL_GPUTransferBufferCreateInfo buffer_info{};
+    buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    buffer_info.size = (std::uint32_t)(4*width*height);
+    buffer_info.props = 0;
+
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+    SDL_GPUCopyPass* image_copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+
+    auto* transfer_buffer = SDL_CreateGPUTransferBuffer(device, &buffer_info);
+
+
+
+
+    SDL_GPUTextureTransferInfo transfer_info{};
+    transfer_info.transfer_buffer = transfer_buffer;
+    transfer_info.pixels_per_row = width;
+    transfer_info.offset = 0;
+    transfer_info.rows_per_layer = 1;
+
+
+    SDL_GPUTextureRegion texture_region{};
+    texture_region.texture = texture;
+    texture_region.d = 0;
+    texture_region.h = height;
+    texture_region.w = width;
+    texture_region.layer = 0;
+    texture_region.mip_level = 0;
+    texture_region.x=0;
+    texture_region.y=0;
+    texture_region.z=0;
+
+    void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,false);
+
+    SDL_memcpy(mapped_data, texture_data.data(), 4*width*height);
+
+    SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
+
+
+    SDL_UploadToGPUTexture(image_copy_pass,&transfer_info,&texture_region, true);
+
+  //  SDL_UploadToGPUBuffer(ib_copy_pass, &transfer_location, &buffer_region, true);
+    SDL_EndGPUCopyPass(image_copy_pass);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
+    return graphics_resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),name);
+}
+
+void Initialize_GBuffer(SDL_GPUDevice* device) {
+    std::string gbuffer_position = "GBUFFER_POSITION";
+    std::string gbuffer_normal = "GBUFFER_NORMAL";
+    std::string gbuffer_albedo = "GBUFFER_ALBEDO";
+    std::string gbuffer_metallic_roughness = "GBUFFER_METALLICROUGHNESS";
+    GBUFFER_POSITION =Load_GBufferTexture(device,gbuffer_position);
+    GBUFFER_ALBEDO =Load_GBufferTexture(device,gbuffer_albedo);
+    GBUFFER_NORMAL =Load_GBufferTexture(device,gbuffer_normal);
+    GBUFFER_METALLICROUGHNESS =Load_GBufferTexture(device,gbuffer_metallic_roughness);
+
+
+
+
+
+}
+
 
 void Update_Camera(CameraUniform& camera_uniform) {
 

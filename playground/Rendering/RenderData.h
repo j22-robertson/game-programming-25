@@ -48,6 +48,8 @@ struct Light {
 
 constexpr std::uint32_t INVALID_ID = std::numeric_limits<std::uint32_t>::max();
 
+
+
 struct Vertex {
     float x,y,z;
     float nx,ny,nz;
