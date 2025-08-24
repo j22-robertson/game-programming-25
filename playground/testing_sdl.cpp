@@ -433,13 +433,26 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     //Mesh_UploadToGPU(device, square_vertices, indices);
 
 
-    Light light = {};
-    light.type = LightType::DEFAULT_LIGHT;
-    light.position = glm::vec3(3.0,3.0,3.0);
-    light.ambient = glm::vec3(1.0,1.0,1.0);
-    light.specular = glm::vec3(1.0,1.0,1.0);
-    light.diffuse = glm::vec3(1.0,1.0,1.0);
-    scene_lights.push_back(light);
+    Light directional_light = {};
+    directional_light.type = LightType::DIRECTIONAL;
+    directional_light.position = glm::vec3(3.0,3.0,3.0);
+    directional_light.ambient = glm::vec3(1.0,1.0,1.0);
+    directional_light.specular = glm::vec3(1.0,1.0,1.0);
+    directional_light.diffuse = glm::vec3(1.0,1.0,1.0);
+    directional_light.direction = glm::vec3(3.0,0.0,0.0);
+    scene_lights.push_back(directional_light);
+
+    Light spotlight = {};
+    spotlight.type = LightType::SPOTLIGHT;
+    spotlight.position = glm::vec3(4.0,3.0,4.0);
+    spotlight.ambient = glm::vec3(0.5,0.5,0.5);
+    spotlight.specular = glm::vec3(0.5,0.5,0.5);
+    spotlight.diffuse = glm::vec3(0.5,0.5,0.5);
+    spotlight.direction = glm::vec3(4.0,3.0,4.0)-glm::vec3(3.0,3.0,3.0);
+    spotlight.cutoff = glm::cos(glm::radians(12.0f));
+    spotlight.outer_cutoff = glm::cos(glm::radians(17.0f));
+    scene_lights.push_back(spotlight);
+
 
 
     SDL_GPUTextureCreateInfo depth_texture_info = {};
