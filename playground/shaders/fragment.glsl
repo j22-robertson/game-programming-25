@@ -1,4 +1,5 @@
 #version 460
+const int MAX_LIGHTS=100;
 
 layout (location = 0) in vec2 texcoord;
 layout (location = 1) in mat3 btn_matrix;
@@ -11,6 +12,25 @@ layout(std140, set = 3, binding = 0) uniform UniformBlock   {
     float time;
 };
 
+struct Light {
+    int type;
+    vec3 position;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float constant;
+    float linear;
+    float quadratic;
+    float cutoff;
+};
+layout(std140, set = 3, binding = 1) uniform NumLights   {
+    int num_lights;
+};
+
+layout (std140, set=3, binding=2) uniform SceneLights{
+    Light lights[MAX_LIGHTS];
+};
+
 layout(set=2, binding=0)uniform sampler2D albedo_texture;
 layout(set=2, binding=1)uniform sampler2D normal_map;
 layout(set=2, binding=2)uniform sampler2D roughness_texture;
@@ -18,7 +38,8 @@ layout(set=2, binding=3)uniform sampler2D metallic_texture;
 
 void main()
 {
-    vec3 light_pos = vec3(-3.0,3.0,-3.0);
+
+    vec3 light_pos = lights[0].position;
 
 
     vec3 normal = texture(normal_map, texcoord).rgb;
@@ -30,15 +51,15 @@ void main()
     vec3 half_way = normalize(light_direction + view_direction);
 
     float spec  = pow(max(dot(normal,half_way),0.0),32.0);
-    vec3 specular = vec3(1.0,1.0,1.0) * spec;
+    vec3 specular = lights[0].specular * spec;
 
     float ambient_strength = 0.5;
-    vec3 ambient = ambient_strength * vec3(1.0,1.0,1.0);
+    vec3 ambient = ambient_strength * lights[0].ambient;
 
 
 
     float diff = max(dot(normal,light_direction),0.0);
-    vec3 diffuse = diff * vec3(1.0,1.0,1.0);
+    vec3 diffuse = diff * lights[0].diffuse;
 
 
     vec3 temp = btn_matrix* vec3(1.0,1.0,1.0);

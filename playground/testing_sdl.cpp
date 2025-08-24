@@ -54,7 +54,7 @@ struct Camera {
         return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation);
     }
 
-    glm::mat4 View_Matrix()
+    glm::mat4 View_Matrix() const
     {
         const glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.0f), position);
         const glm::mat4 cameraRotation = Rotation_Matrix();
@@ -65,7 +65,6 @@ struct Camera {
         const glm::mat4 rot = Rotation_Matrix();
 
         position += glm::vec3(rot * glm::vec4(velocity *  0.005f, 0.0f));
-       // SDL_Log(("position x:" + std::to_string(position.x) + "position y:" + std::to_string(position.y)+"position z:" + std::to_string(position.z)+" ").c_str());
     }
 
 };
@@ -127,6 +126,8 @@ static TimeStep sim_time{};
 static Camera camera;
 //static CameraUniform camera_uniform;
 int mesh_count = 0;
+
+std::vector<Light> scene_lights;
 
 void Load_Texture2DFromFile(SDL_GPUDevice* device, const std::string& filename) {
 
@@ -432,6 +433,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     //Mesh_UploadToGPU(device, square_vertices, indices);
 
 
+    Light light = {};
+    light.type = LightType::DEFAULT_LIGHT;
+    light.position = glm::vec3(3.0,3.0,3.0);
+    light.ambient = glm::vec3(1.0,1.0,1.0);
+    light.specular = glm::vec3(1.0,1.0,1.0);
+    light.diffuse = glm::vec3(1.0,1.0,1.0);
+    scene_lights.push_back(light);
+
 
     SDL_GPUTextureCreateInfo depth_texture_info = {};
     depth_texture_info.width = 960.0f;
@@ -514,7 +523,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     fragment_shader_info.num_samplers = 4;
     fragment_shader_info.num_storage_buffers = 0;
     fragment_shader_info.num_storage_textures = 0;
-    fragment_shader_info.num_uniform_buffers = 1;
+    fragment_shader_info.num_uniform_buffers = 3;
     fragment_shader = SDL_CreateGPUShader(device, &fragment_shader_info);
 
     SDL_free(fragment_code);
@@ -717,7 +726,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     //transforms.front().Translate(move);
     Update_InstanceBuffer();
 
+    std::uint32_t num_lights = scene_lights.size();
+
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::uint32_t));
+    SDL_PushGPUFragmentUniformData(command_buffer,2,scene_lights.data(),sizeof(Light)*scene_lights.size());
+
     for (const auto& mesh : models["CUBE"].mesh_storage) {
         SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
         texture_sampler_binding[0].sampler = sampler;

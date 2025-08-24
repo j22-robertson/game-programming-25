@@ -8,8 +8,10 @@
 #include <queue>
 
 
+
 #ifndef GP25_EXERCISES_RENDERDATA_H
 #define GP25_EXERCISES_RENDERDATA_H
+
 
 enum PBRTextureType {
     ALBEDO =0,
@@ -19,6 +21,28 @@ enum PBRTextureType {
     AMBIENT_OCCLUSION = 4,
     INVALID = -1,
 };
+
+enum LightType : std::uint32_t {
+    DIRECTIONAL= 0,
+    SPOTLIGHT=1,
+    POINT_LIGHT=2,
+    DEFAULT_LIGHT = 0,
+    INVALID_LIGHT = std::numeric_limits<std::uint32_t>::max(),
+};
+
+struct Light {
+    LightType type;
+    glm::vec3 position;
+    glm::vec3 ambient;
+    glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
+    glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
+    float constant = 1.0f;
+    float linear = 0.9f;
+    float quadratic = 0.032f;
+    float cutoff= glm::cos(glm::radians(12.5f));
+};
+
+
 
 constexpr std::uint32_t INVALID_ID = std::numeric_limits<std::uint32_t>::max();
 
