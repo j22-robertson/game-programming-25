@@ -22,16 +22,15 @@ enum PBRTextureType {
     INVALID = -1,
 };
 
-enum LightType : std::uint32_t {
+enum LightType : std::int32_t {
     DIRECTIONAL= 0,
     SPOTLIGHT=1,
     POINT_LIGHT=2,
-    DEFAULT_LIGHT = 0,
-    INVALID_LIGHT = std::numeric_limits<std::uint32_t>::max(),
+    INVALID_LIGHT = std::numeric_limits<std::int32_t>::max(),
 };
 
 struct Light {
-    LightType type;
+    std::int32_t type;
     glm::vec3 position = glm::vec3(0.0f);
     glm::vec3 ambient = glm::vec3(1.0f, 1.0f, 1.0f);
     glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -42,6 +41,7 @@ struct Light {
     float quadratic = 0.032f;
     float cutoff= glm::cos(glm::radians(12.5f));
     float outer_cutoff = 0.0f;
+    glm::vec3 padding = glm::vec3(0.0f);
 };
 
 

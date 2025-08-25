@@ -11,6 +11,8 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 #include <iostream>
+
+#include "code/AssetLib/glTF2/glTF2Exporter.h"
 #include "Rendering/RenderUtils.h"
 
 
@@ -114,6 +116,9 @@ GraphicsResources graphics_resources;
 SDL_GPUShader* grid_fragment_shader = nullptr;
 
 SDL_GPUShader* grid_vertex_shader = nullptr;
+
+SDL_GPUShader* geometry_fragment_shader=nullptr;
+SDL_GPUShader* geometry_vertex_shader=nullptr;
 
 SDL_GPUGraphicsPipeline* graphics_pipeline = nullptr;
 SDL_GPUGraphicsPipeline* grid_pipeline = nullptr;
@@ -286,15 +291,100 @@ void Initialize_GBuffer(SDL_GPUDevice* device) {
     std::string gbuffer_normal = "GBUFFER_NORMAL";
     std::string gbuffer_albedo = "GBUFFER_ALBEDO";
     std::string gbuffer_metallic_roughness = "GBUFFER_METALLICROUGHNESS";
+
     GBUFFER_POSITION =Load_GBufferTexture(device,gbuffer_position);
     GBUFFER_ALBEDO =Load_GBufferTexture(device,gbuffer_albedo);
     GBUFFER_NORMAL =Load_GBufferTexture(device,gbuffer_normal);
     GBUFFER_METALLICROUGHNESS =Load_GBufferTexture(device,gbuffer_metallic_roughness);
+}
+
+void Load_GeometryPipeline(SDL_GPUDevice* device) {
+
+    size_t vertex_shader_size = 0;
+    void* vertex_code = SDL_LoadFile("../playground/shaders/geometry_vertex.spv", &vertex_shader_size);
+
+    SDL_GPUShaderCreateInfo vertex_shader_info{};
+    vertex_shader_info.code = (Uint8*)vertex_code; //convert to an array of bytes
+    vertex_shader_info.code_size = vertex_shader_size;
+    vertex_shader_info.entrypoint = "main";
+    vertex_shader_info.format = SDL_GPU_SHADERFORMAT_SPIRV; // loading .spv shaders
+    vertex_shader_info.stage = SDL_GPU_SHADERSTAGE_VERTEX; // vertex shader
+    vertex_shader_info.num_samplers = 0;
+    vertex_shader_info.num_storage_buffers = 0;
+    vertex_shader_info.num_storage_textures = 0;
+    vertex_shader_info.num_uniform_buffers = 1;
+
+    geometry_vertex_shader = SDL_CreateGPUShader(device, &vertex_shader_info);
+
+    SDL_free(vertex_code);
+
+
+    size_t fragment_shader_size = 0;
+    void* fragment_code = SDL_LoadFile("../playground/shaders/geometry_fragment.spv",&fragment_shader_size);
+
+    SDL_GPUShaderCreateInfo fragment_shader_info{};
+    fragment_shader_info.code = (Uint8*)fragment_code;
+    fragment_shader_info.code_size = fragment_shader_size;
+    fragment_shader_info.entrypoint = "main";
+    fragment_shader_info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    fragment_shader_info.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    fragment_shader_info.num_samplers = 0;
+    fragment_shader_info.num_storage_buffers =  0;
+    fragment_shader_info.num_storage_textures = 0;
+    fragment_shader_info.num_uniform_buffers = 0;
+    geometry_fragment_shader = SDL_CreateGPUShader(device, &fragment_shader_info);
+    SDL_free(fragment_code);
+
+
+    SDL_GPUGraphicsPipelineCreateInfo geometry_pipeline_info{};
+    geometry_pipeline_info.vertex_shader = geometry_vertex_shader;
+    geometry_pipeline_info.fragment_shader = geometry_fragment_shader;
+
+   /*
+    grid_pipeline_info.vertex_shader = grid_vertex_shader;
+    grid_pipeline_info.fragment_shader = grid_fragment_shader;
+
+    grid_pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+
+    grid_pipeline_info.vertex_input_state.num_vertex_buffers = 0;
+    grid_pipeline_info.vertex_input_state.vertex_buffer_descriptions = nullptr;
+
+    grid_pipeline_info.vertex_input_state.num_vertex_attributes=0;
+    grid_pipeline_info.vertex_input_state.vertex_attributes = nullptr;
+
+    grid_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    grid_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+
+    grid_pipeline_info.depth_stencil_state.enable_depth_test = false;
+    grid_pipeline_info.depth_stencil_state.enable_depth_write = false;
+    grid_pipeline_info.target_info.has_depth_stencil_target = false;
+
+   grid_pipeline_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
 
 
 
+    SDL_GPUColorTargetDescription color_target_descriptions[1];
+
+    color_target_descriptions[0] = {};
+    color_target_descriptions[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
+
+    color_target_descriptions[0].blend_state.enable_blend = true;
+    color_target_descriptions[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_descriptions[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    color_target_descriptions[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    color_target_descriptions[0].blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_descriptions[0].blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ZERO;
+    color_target_descriptions[0].blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
 
 
+
+    grid_pipeline_info.target_info.num_color_targets = 1;
+    grid_pipeline_info.target_info.color_target_descriptions = color_target_descriptions;
+
+    grid_pipeline = SDL_CreateGPUGraphicsPipeline(device,&grid_pipeline_info);
+    if (grid_pipeline == nullptr) {
+        SDL_Log("Grid Pipeline has failed");
+    } */
 }
 
 
@@ -318,8 +408,7 @@ void Update_Camera(CameraUniform& camera_uniform) {
     camera_uniform.position = camera.position;
     camera_uniform.projection = glm::perspective(glm::radians(70.0f), (float)960 / (float)540, 0.1f, 1000.0f);
 
-
-
+    scene_lights[1].position = camera.position;
     camera_uniform.projection[1][1] *= -1;
 }
 
@@ -529,22 +618,22 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
     Light directional_light = {};
-    directional_light.type = LightType::DIRECTIONAL;
-    directional_light.position = glm::vec3(3.0,3.0,3.0);
+    directional_light.type = 0;
+    directional_light.position = glm::vec3(3.0,9.0,3.0);
     directional_light.ambient = glm::vec3(1.0,1.0,1.0);
     directional_light.specular = glm::vec3(1.0,1.0,1.0);
     directional_light.diffuse = glm::vec3(1.0,1.0,1.0);
-    directional_light.direction = glm::vec3(3.0,0.0,0.0);
+    directional_light.direction = glm::vec3(3.0,40.0,3.0);
     scene_lights.push_back(directional_light);
 
     Light spotlight = {};
-    spotlight.type = LightType::SPOTLIGHT;
-    spotlight.position = glm::vec3(4.0,3.0,4.0);
-    spotlight.ambient = glm::vec3(0.5,0.5,0.5);
-    spotlight.specular = glm::vec3(0.5,0.5,0.5);
-    spotlight.diffuse = glm::vec3(0.5,0.5,0.5);
-    spotlight.direction = glm::vec3(4.0,3.0,4.0)-glm::vec3(3.0,3.0,3.0);
-    spotlight.cutoff = glm::cos(glm::radians(12.0f));
+    spotlight.type =1;
+    spotlight.position = glm::vec3(0.0,0.0,1.0);
+    spotlight.ambient = glm::vec3(1.0,1.0,1.0);
+    spotlight.specular = glm::vec3(1.0,1.0,1.0);
+    spotlight.diffuse = glm::vec3(1.0,1.0,1.0);
+    spotlight.direction = glm::vec3(0.1,0.1,1.0);
+    spotlight.cutoff = glm::cos(glm::radians(12.5f));
     spotlight.outer_cutoff = glm::cos(glm::radians(17.0f));
     scene_lights.push_back(spotlight);
 
@@ -735,7 +824,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     Transform transform{};
     transform.Get_Scale()= glm::vec3(1.0,1.0,1.0);
-    transform.Get_Position() = glm::vec3(3.0,0.0,3.0);
+    transform.Get_Position() = glm::vec3(0.0,0.0,0.0);
 
     Transform test_transform{};
     test_transform.Get_Scale()= glm::vec3(2.0,2.0,2.0);
@@ -834,10 +923,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     //transforms.front().Translate(move);
     Update_InstanceBuffer();
 
-    std::uint32_t num_lights = scene_lights.size();
+    std::int32_t num_lights = scene_lights.size();
 
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
-    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::uint32_t));
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::int32_t));
     SDL_PushGPUFragmentUniformData(command_buffer,2,scene_lights.data(),sizeof(Light)*scene_lights.size());
 
     for (const auto& mesh : models["CUBE"].mesh_storage) {
