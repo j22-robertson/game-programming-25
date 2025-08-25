@@ -37,6 +37,8 @@ struct CameraUniform {
     glm::mat4 projection;
 };
 
+int debug_number=0;
+
 struct Camera {
     glm::vec3 velocity;
     glm::vec3 position;
@@ -66,7 +68,7 @@ struct Camera {
     {
         const glm::mat4 rot = Rotation_Matrix();
 
-        position += glm::vec3(rot * glm::vec4(velocity *  0.005f, 0.0f));
+        position += glm::vec3( rot* glm::vec4(velocity *  0.005f, 0.0f));
     }
 
 };
@@ -309,7 +311,7 @@ void Load_GeometryPipeline(SDL_GPUDevice* device) {
     vertex_shader_info.entrypoint = "main";
     vertex_shader_info.format = SDL_GPU_SHADERFORMAT_SPIRV; // loading .spv shaders
     vertex_shader_info.stage = SDL_GPU_SHADERSTAGE_VERTEX; // vertex shader
-    vertex_shader_info.num_samplers = 0;
+    vertex_shader_info.num_samplers =4;
     vertex_shader_info.num_storage_buffers = 0;
     vertex_shader_info.num_storage_textures = 0;
     vertex_shader_info.num_uniform_buffers = 1;
@@ -628,11 +630,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     Light spotlight = {};
     spotlight.type =1;
-    spotlight.position = glm::vec3(0.0,0.0,1.0);
+    spotlight.position = glm::vec3(-1.0,0.0,0.0);
     spotlight.ambient = glm::vec3(1.0,1.0,1.0);
     spotlight.specular = glm::vec3(1.0,1.0,1.0);
     spotlight.diffuse = glm::vec3(1.0,1.0,1.0);
-    spotlight.direction = glm::vec3(0.1,0.1,1.0);
+    spotlight.direction = glm::vec3(1.0,0.0,0.0);
     spotlight.cutoff = glm::cos(glm::radians(12.5f));
     spotlight.outer_cutoff = glm::cos(glm::radians(17.0f));
     scene_lights.push_back(spotlight);
@@ -673,7 +675,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     //Load_Texture2DFromFile(device,"../playground/Textures/red-clay-wall-albedo.png" );
 
-    Load_Texture2DFromFile(device,"../playground/Models/ornate_mirror/textures/Mirror_material_baseColor.jpeg" );
+   // Load_Texture2DFromFile(device,"../playground/Models/ornate_mirror/textures/Mirror_material_baseColor.jpeg" );
     size_t vertex_shader_size = 0;
     void* vertex_code = SDL_LoadFile("../playground/shaders/vertex.spv", &vertex_shader_size);
 
@@ -695,6 +697,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     void* fragment_code = SDL_LoadFile("../playground/shaders/fragment.spv",&fragment_shader_size);
 
     SDL_GPUSamplerCreateInfo  sampler_create_info{};
+
 
     sampler_create_info.min_filter = SDL_GPU_FILTER_LINEAR;
     sampler_create_info.mag_filter = SDL_GPU_FILTER_LINEAR;
@@ -720,7 +723,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     fragment_shader_info.num_samplers = 4;
     fragment_shader_info.num_storage_buffers = 0;
     fragment_shader_info.num_storage_textures = 0;
-    fragment_shader_info.num_uniform_buffers = 3;
+    fragment_shader_info.num_uniform_buffers = 4;
     fragment_shader = SDL_CreateGPUShader(device, &fragment_shader_info);
 
     SDL_free(fragment_code);
@@ -750,31 +753,34 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     graphics_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
 
     SDL_GPUVertexAttribute vertex_attributes[9];
-
+    std::uint32_t offset = 0;
     vertex_attributes[0].buffer_slot=0;
     vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[0].location = 0;
     vertex_attributes[0].offset = 0;
 
+    offset += sizeof(glm::vec3);
+
     vertex_attributes[1].buffer_slot=0;
     vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
     vertex_attributes[1].location = 1;
-    vertex_attributes[1].offset = sizeof(float)*3;
-
-    vertex_attributes[2].buffer_slot=0;
-    vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
-    vertex_attributes[2].location = 2;
-    vertex_attributes[2].offset = sizeof(float)*6;
+    vertex_attributes[1].offset = offset;
+    offset += sizeof(glm::vec3);
 
     vertex_attributes[3].buffer_slot=0;
     vertex_attributes[3].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    vertex_attributes[3].location = 3;
-    vertex_attributes[3].offset = sizeof(float)*8;
-
+    vertex_attributes[3].location = 2;
+    vertex_attributes[3].offset = offset;
+    offset += sizeof(glm::vec3);;
     vertex_attributes[4].buffer_slot=0;
     vertex_attributes[4].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3;
-    vertex_attributes[4].location = 4;
-    vertex_attributes[4].offset = sizeof(float)*11;
+    vertex_attributes[4].location = 3;
+    vertex_attributes[4].offset = offset;
+    offset += sizeof(glm::vec3);
+    vertex_attributes[2].buffer_slot=0;
+    vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attributes[2].location = 4;
+    vertex_attributes[2].offset = offset;
 
     vertex_attributes[5].buffer_slot = 1;
     vertex_attributes[5].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
@@ -928,9 +934,19 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_PushGPUFragmentUniformData(command_buffer,0,&sim_time,sizeof(TimeStep));
     SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::int32_t));
     SDL_PushGPUFragmentUniformData(command_buffer,2,scene_lights.data(),sizeof(Light)*scene_lights.size());
-
+    auto debug_color=glm::vec4(1.0,0.0,0.0,0.0);
+    auto main_color =glm::vec4(1.0,1.0,1.0,0.0);
+    SDL_PushGPUFragmentUniformData(command_buffer, 3, &debug_color,sizeof(glm::vec4));
+    int current_model = 0;
     for (const auto& mesh : models["CUBE"].mesh_storage) {
         SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
+
+        if (debug_number==current_model) {
+            SDL_PushGPUFragmentUniformData(command_buffer, 3, &debug_color,sizeof(glm::vec4));
+        }
+        else {
+            SDL_PushGPUFragmentUniformData(command_buffer, 3, &main_color,sizeof(glm::vec4));
+        }
         texture_sampler_binding[0].sampler = sampler;
         texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(mesh.material.albedo)->Get_GPUTexture();
         texture_sampler_binding[1].sampler = sampler;
@@ -958,11 +974,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 
         SDL_BindGPUVertexBuffers(render_pass,0,buffer_bindings,2);
-        SDL_BindGPUIndexBuffer(render_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_16BIT);
+        SDL_BindGPUIndexBuffer(render_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
         SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),transforms.size(),0,0,0);
-
+        current_model++;
     }
+    current_model=0;
 
 
 
@@ -985,6 +1002,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     }
     if (event->key.down) {
         switch (event->key.scancode){
+            case SDL_SCANCODE_Y:
+                debug_number+=1;
+
+                break;
             case SDL_SCANCODE_W:
                 camera.velocity.z =-1;
                 break;

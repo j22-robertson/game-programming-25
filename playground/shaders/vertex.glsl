@@ -10,9 +10,9 @@ layout(std140, set=1, binding=0) uniform UniformBufferObject
 
 layout (location = 0) in vec3 a_position;
 layout (location = 1) in vec3 a_normal;
-layout (location = 2) in vec2 a_tex;
-layout (location = 3) in vec3 a_tangent;
-layout (location = 4) in vec3 a_bitangent;
+layout (location = 2) in vec3 a_tangent;
+layout (location = 3) in vec3 a_bitangent;
+layout (location = 4) in vec2 a_tex;
 layout (location = 5) in vec4 model_matrix_x;
 layout (location = 6) in vec4 model_matrix_y;
 layout (location = 7) in vec4 model_matrix_z;

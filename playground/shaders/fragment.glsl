@@ -33,6 +33,9 @@ layout(std140, set = 3, binding = 1) uniform NumLights   {
 layout (std140, set=3, binding=2) uniform SceneLights{
     Light lights[MAX_LIGHTS];
 };
+layout (std140, set=3, binding=3) uniform DebugColor{
+    vec4 debug_color;
+};
 
 layout(set=2, binding=0)uniform sampler2D albedo_texture;
 layout(set=2, binding=1)uniform sampler2D normal_map;
@@ -51,7 +54,7 @@ vec3 CalculateDirectional(Light directional, vec3 normal, vec3 view,float shine)
 
     vec3 ambient = directional.ambient * vec3(texture(albedo_texture,texcoord).rgb);
     vec3 diffuse = directional.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = directional.specular*  spec *vec3(texture(metallic_texture,texcoord).rgb);
+    vec3 specular = directional.specular*  spec *texture(metallic_texture,texcoord).r;
     return (ambient+diffuse+specular);
 }
 
@@ -113,13 +116,13 @@ void main()
     //vec3 light_direction = btn_matrix*normalize(lights[0].direction -fragment_position);
     vec3 view_direction = btn_matrix*normalize(view_position-fragment_position);
 
+
     vec3 light_output = vec3(0.0,0.0,0.0);
 
     for(int i = 0; i < num_lights; i++)
     {
         Light light = lights[i];
-        vec3 light_direction =btn_matrix * normalize(light.position -fragment_position);
-        light_direction= btn_matrix*normalize(view_position-fragment_position);
+        vec3 light_direction = btn_matrix * normalize(light.position -fragment_position);
         vec3 half_way = normalize(light_direction + view_direction);
         switch(light.type){
             case 0:
@@ -132,6 +135,7 @@ void main()
 
     //FragColor = vec4((ambient+diffuse+specular)*albedo.rgb,1.0);
 
+    vec3 ambient = texture(albedo_texture,texcoord).rgb;
 
     FragColor = vec4(light_output,1.0);
 

@@ -81,7 +81,7 @@ inline std::uint32_t Upload_Texture2DFromFile(SDL_GPUDevice* device,SDL_GPUComma
 
     void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,false);
 
-    SDL_memcpy(mapped_data, data, (channels*width*height));
+    SDL_memcpy(mapped_data, data, (4*width*height));
 
     SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
 
@@ -135,12 +135,15 @@ inline Mesh Process_Mesh(const aiMesh* mesh, const aiScene* scene,GraphicsResour
         vertex.ny = mesh->mNormals[i].y;
         vertex.nz = mesh->mNormals[i].z;
         if (mesh->mTextureCoords[0]) {
+            if (mesh->mTextureCoords[0][i].x< 0 || mesh->mTextureCoords[0][i].y <0) {
+                SDL_Log("Texture coordinates empty for mesh");
+            }
             vertex.u=mesh->mTextureCoords[0][i].x;
             vertex.v= mesh->mTextureCoords[0][i].y;
         }
         else {
-            vertex.u=(float)(mesh->mVertices[i].x*0.5 +0.5);
-            vertex.v=(float)(mesh->mVertices[i].y*0.5 +0.5);
+            //vertex.u=(float)(mesh->mVertices[i].x*0.5 +0.5);
+            //vertex.v=(float)(mesh->mVertices[i].y*0.5 +0.5);
         }
         if (mesh->mTangents != nullptr) {
             vertex.tx = mesh->mTangents[i].x;
@@ -223,7 +226,7 @@ inline void Mesh_UploadToGPU(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command
 
     SDL_GPUCopyPass* ib_copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-    const std::uint32_t index_buffer_size = sizeof(std::uint16_t)*mesh.indices.size();
+    const std::uint32_t index_buffer_size = sizeof(std::uint32_t)*mesh.indices.size();
 
 
     SDL_GPUBufferCreateInfo index_buffer_info{};
@@ -239,7 +242,7 @@ inline void Mesh_UploadToGPU(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command
 
     SDL_GPUTransferBuffer* ib_transfer_buffer = SDL_CreateGPUTransferBuffer(device, &ib_transfer_buffer_info);
 
-    uint16_t* ib_data = (uint16_t*)SDL_MapGPUTransferBuffer(device, ib_transfer_buffer, false);
+    std::uint32_t* ib_data = (std::uint32_t*)SDL_MapGPUTransferBuffer(device, ib_transfer_buffer, false);
 
     SDL_memcpy(ib_data,mesh.indices.data(),index_buffer_size);
     SDL_UnmapGPUTransferBuffer(device, ib_transfer_buffer);
@@ -273,11 +276,6 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
     for (int i = 0; i < node->mNumMeshes; i++) {
         std::uint32_t mesh_index = node->mMeshes[i];
         aiMesh* mesh = scene->mMeshes[mesh_index];
-
-
-
-
-
         auto& mesh_to_load = meshes.emplace_back(Process_Mesh(mesh, scene, resources));
         if (mesh->mMaterialIndex>=0) {
             const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
@@ -295,9 +293,9 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
             //mesh_to_load.material.ao=INVALID_ID;
 
         }
-
+        std::string step = "step:"+std::to_string(step_count);
         std::string node_name =node->mName.C_Str();
-        Mesh_UploadToGPU(device, command_buffer, resources, mesh_to_load, mesh->mName.C_Str()+node_name+std::to_string(i)+std::to_string(step_count));
+        Mesh_UploadToGPU(device, command_buffer, resources, mesh_to_load, mesh->mName.C_Str()+node_name+std::to_string(i)+=step);
     }
     step_count+=1;
     for (int i = 0; i < node->mNumChildren; i++) {
@@ -308,7 +306,7 @@ inline void Process_Node(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_bu
 inline Model Load_ModelDataFromFile(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const std::string& filename,GraphicsResources& resources) {
     std::vector<Mesh> loaded_meshes;
     Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate | aiProcess_FlipUVs |aiProcess_CalcTangentSpace| aiProcess_SplitLargeMeshes);
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate |aiProcess_CalcTangentSpace|aiProcess_FlipUVs );
 
 
     auto& node = scene->mRootNode;

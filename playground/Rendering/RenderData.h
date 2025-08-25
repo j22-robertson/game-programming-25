@@ -53,13 +53,13 @@ constexpr std::uint32_t INVALID_ID = std::numeric_limits<std::uint32_t>::max();
 struct Vertex {
     float x,y,z;
     float nx,ny,nz;
-    float u,v;
     float tx,ty,tz;
     float btx,bty,btz;
+    float u,v;
 };
 
 using Vertices = std::vector<Vertex>;
-using Indices = std::vector<std::uint16_t>;
+using Indices = std::vector<std::uint32_t>;
 
 
 
