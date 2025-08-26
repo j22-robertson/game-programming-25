@@ -731,7 +731,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
    // Load_Texture2DFromFile(device,"../playground/Models/ornate_mirror/textures/Mirror_material_baseColor.jpeg" );
     size_t vertex_shader_size = 0;
-    void* vertex_code = SDL_LoadFile("../playground/shaders/vertex.spv", &vertex_shader_size);
+    void* vertex_code = SDL_LoadFile("../playground/shaders/deferred_vs.spv", &vertex_shader_size);
 
     SDL_GPUShaderCreateInfo vertex_shader_info{};
     vertex_shader_info.code = (Uint8*)vertex_code; //convert to an array of bytes
@@ -742,13 +742,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     vertex_shader_info.num_samplers = 0;
     vertex_shader_info.num_storage_buffers = 0;
     vertex_shader_info.num_storage_textures = 0;
-    vertex_shader_info.num_uniform_buffers = 1;
+    vertex_shader_info.num_uniform_buffers = 0;
     SDL_GPUShader* vertex_shader = SDL_CreateGPUShader(device, &vertex_shader_info);
 
     SDL_free(vertex_code);
 
     size_t fragment_shader_size = 0;
-    void* fragment_code = SDL_LoadFile("../playground/shaders/fragment.spv",&fragment_shader_size);
+    void* fragment_code = SDL_LoadFile("../playground/shaders/deferred_fs.spv",&fragment_shader_size);
 
     SDL_GPUSamplerCreateInfo  sampler_create_info{};
 
@@ -777,7 +777,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     fragment_shader_info.num_samplers = 4;
     fragment_shader_info.num_storage_buffers = 0;
     fragment_shader_info.num_storage_textures = 0;
-    fragment_shader_info.num_uniform_buffers = 4;
+    fragment_shader_info.num_uniform_buffers = 0;
     fragment_shader = SDL_CreateGPUShader(device, &fragment_shader_info);
 
     SDL_free(fragment_code);
@@ -791,7 +791,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     graphics_pipeline_info.fragment_shader = fragment_shader;
 
     graphics_pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
-
+/*
     SDL_GPUVertexBufferDescription vertex_buffer_descriptions[2];
 
     vertex_buffer_descriptions[0].slot = 0;
@@ -856,9 +856,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     vertex_attributes[8].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4;
     vertex_attributes[8].location = 8;
     vertex_attributes[8].offset = sizeof(float)*12;
-
-    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=9;
-    graphics_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
+*/
+    graphics_pipeline_info.vertex_input_state.num_vertex_attributes=0;
+    graphics_pipeline_info.vertex_input_state.vertex_attributes = nullptr;
 
     graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     graphics_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
@@ -1002,7 +1002,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         SDL_BindGPUIndexBuffer(geometry_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
         SDL_DrawGPUIndexedPrimitives(geometry_pass,mesh.indices.size(),transforms.size(),0,0,0);
-
     }
 
     SDL_EndGPURenderPass(geometry_pass);
@@ -1094,6 +1093,24 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     current_model=0;
 
 */
+    SDL_BindGPUGraphicsPipeline(render_pass,graphics_pipeline);
+    SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
+
+    texture_sampler_binding[0].sampler = sampler;
+    texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();
+    texture_sampler_binding[1].sampler = sampler;
+    texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
+
+    texture_sampler_binding[2].sampler = sampler;
+    texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
+
+    texture_sampler_binding[3].sampler = sampler;
+    texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
+
+    SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
+
+    SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
+
 
 
     // DRAW HERE
