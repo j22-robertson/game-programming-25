@@ -229,7 +229,7 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
     texture_info.height = height;
     texture_info.layer_count_or_depth = 1;
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
-    texture_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    texture_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     texture_info.num_levels = 1;
 
@@ -238,7 +238,7 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
 
     SDL_GPUTransferBufferCreateInfo buffer_info{};
     buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    buffer_info.size = (std::uint32_t)(4*width*height);
+    buffer_info.size = static_cast<std::uint32_t>(4 * width * height);
     buffer_info.props = 0;
 
 
@@ -281,6 +281,8 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
 
   //  SDL_UploadToGPUBuffer(ib_copy_pass, &transfer_location, &buffer_region, true);
     SDL_EndGPUCopyPass(image_copy_pass);
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer_buffer);
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
@@ -930,10 +932,82 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     depth_stencil_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
     depth_stencil_target_info.store_op = SDL_GPU_STOREOP_STORE;
 
+
+
+    CameraUniform camera_uniform{};
+    Update_Camera(camera_uniform);
+
     if (swapchain_texture==nullptr) {
         SDL_SubmitGPUCommandBuffer(command_buffer);
         return SDL_APP_CONTINUE;
     }
+
+
+
+    SDL_GPUColorTargetInfo color_target_info[4];
+    color_target_info[0] = SDL_GPUColorTargetInfo{};
+    color_target_info[0].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[0].load_op = SDL_GPU_LOADOP_CLEAR;
+    color_target_info[0].store_op = SDL_GPU_STOREOP_STORE;
+    color_target_info[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
+    color_target_info[1] = SDL_GPUColorTargetInfo{};
+    color_target_info[1].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[1].load_op = SDL_GPU_LOADOP_CLEAR;
+    color_target_info[1].store_op = SDL_GPU_STOREOP_STORE;
+    color_target_info[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
+    color_target_info[2] = SDL_GPUColorTargetInfo{};
+    color_target_info[2].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[2].load_op = SDL_GPU_LOADOP_CLEAR;
+    color_target_info[2].store_op = SDL_GPU_STOREOP_STORE;
+    color_target_info[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();;
+    color_target_info[3] = SDL_GPUColorTargetInfo{};
+
+    color_target_info[3].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[3].load_op = SDL_GPU_LOADOP_CLEAR;
+    color_target_info[3].store_op = SDL_GPU_STOREOP_STORE;
+    color_target_info[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
+
+
+
+    SDL_GPURenderPass* geometry_pass = SDL_BeginGPURenderPass(command_buffer, color_target_info,4, &depth_stencil_target_info);
+    SDL_SetGPUScissor(geometry_pass,&scissor);
+    SDL_SetGPUViewport(geometry_pass,&viewport);
+
+
+    SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
+    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
+    for (const auto& mesh : models["CUBE"].mesh_storage) {
+        SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
+        texture_sampler_binding[0].sampler = sampler;
+        texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(mesh.material.albedo)->Get_GPUTexture();
+        texture_sampler_binding[1].sampler = sampler;
+        texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(mesh.material.normal)->Get_GPUTexture();
+        texture_sampler_binding[2].sampler = sampler;
+        texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(mesh.material.roughness)->Get_GPUTexture();
+        texture_sampler_binding[3].sampler = sampler;
+        texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(mesh.material.metallic)->Get_GPUTexture();
+        SDL_BindGPUFragmentSamplers(geometry_pass,0,texture_sampler_binding,4);
+        SDL_GPUBufferBinding buffer_bindings[2];
+        buffer_bindings[0].buffer = graphics_resources.vertex_buffer_map.Get_Resource(mesh.v_buffer_id)->Get_GPUBuffer();
+        buffer_bindings[0].offset = 0;
+        buffer_bindings[1].buffer = instance_buffer;
+        buffer_bindings[1].offset = 0;
+
+        SDL_GPUBufferBinding ib_buffer_bindings[1];
+        ib_buffer_bindings[0].buffer = graphics_resources.index_buffer_map.Get_Resource(mesh.i_buffer_id)->Get_GPUBuffer();
+        ib_buffer_bindings[0].offset=0;
+
+
+        SDL_BindGPUVertexBuffers(geometry_pass,0,buffer_bindings,2);
+        SDL_BindGPUIndexBuffer(geometry_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+        SDL_DrawGPUIndexedPrimitives(geometry_pass,mesh.indices.size(),transforms.size(),0,0,0);
+
+    }
+
+    SDL_EndGPURenderPass(geometry_pass);
+
+
 
     SDL_GPUColorTargetInfo main_color_target_info{};
     main_color_target_info.clear_color = {0.f, 0.0f,0.0f, .0f};
@@ -941,9 +1015,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     main_color_target_info.store_op = SDL_GPU_STOREOP_STORE;
     main_color_target_info.texture = swapchain_texture;
 
-
-    CameraUniform camera_uniform{};
-    Update_Camera(camera_uniform);
 
 
    // printMatrix(camera_uniform.view,"View: \n");
@@ -1029,65 +1100,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_EndGPURenderPass(render_pass);
 
-    SDL_GPUColorTargetInfo color_target_info[4];
-    color_target_info[0] = SDL_GPUColorTargetInfo{};
-    color_target_info[0].clear_color = {0.f, 0.0f,0.0f, .0f};
-    color_target_info[0].load_op = SDL_GPU_LOADOP_CLEAR;
-    color_target_info[0].store_op = SDL_GPU_STOREOP_STORE;
-    color_target_info[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
-    color_target_info[1] = SDL_GPUColorTargetInfo{};
-    color_target_info[1].clear_color = {0.f, 0.0f,0.0f, .0f};
-    color_target_info[1].load_op = SDL_GPU_LOADOP_CLEAR;
-    color_target_info[1].store_op = SDL_GPU_STOREOP_STORE;
-    color_target_info[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
-    color_target_info[2] = SDL_GPUColorTargetInfo{};
-    color_target_info[2].clear_color = {0.f, 0.0f,0.0f, .0f};
-    color_target_info[2].load_op = SDL_GPU_LOADOP_CLEAR;
-    color_target_info[2].store_op = SDL_GPU_STOREOP_STORE;
-    color_target_info[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();;
-    color_target_info[3] = SDL_GPUColorTargetInfo{};
-    color_target_info[3].clear_color = {0.f, 0.0f,0.0f, .0f};
-    color_target_info[3].load_op = SDL_GPU_LOADOP_CLEAR;
-    color_target_info[3].store_op = SDL_GPU_STOREOP_STORE;
-    color_target_info[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
-
-    SDL_GPURenderPass* geometry_pass = SDL_BeginGPURenderPass(command_buffer, color_target_info,4, &depth_stencil_target_info);
-    SDL_SetGPUScissor(geometry_pass,&scissor);
-    SDL_SetGPUViewport(geometry_pass,&viewport);
 
 
-    SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
-    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
-    for (const auto& mesh : models["CUBE"].mesh_storage) {
-        SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
-        texture_sampler_binding[0].sampler = sampler;
-        texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(mesh.material.albedo)->Get_GPUTexture();
-        texture_sampler_binding[1].sampler = sampler;
-        texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(mesh.material.normal)->Get_GPUTexture();
-        texture_sampler_binding[2].sampler = sampler;
-        texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(mesh.material.roughness)->Get_GPUTexture();
-        texture_sampler_binding[3].sampler = sampler;
-        texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(mesh.material.metallic)->Get_GPUTexture();
-        SDL_BindGPUFragmentSamplers(geometry_pass,0,texture_sampler_binding,4);
-        SDL_GPUBufferBinding buffer_bindings[2];
-        buffer_bindings[0].buffer = graphics_resources.vertex_buffer_map.Get_Resource(mesh.v_buffer_id)->Get_GPUBuffer();
-        buffer_bindings[0].offset = 0;
-        buffer_bindings[1].buffer = instance_buffer;
-        buffer_bindings[1].offset = 0;
-
-        SDL_GPUBufferBinding ib_buffer_bindings[1];
-        ib_buffer_bindings[0].buffer = graphics_resources.index_buffer_map.Get_Resource(mesh.i_buffer_id)->Get_GPUBuffer();
-        ib_buffer_bindings[0].offset=0;
-
-
-        SDL_BindGPUVertexBuffers(geometry_pass,0,buffer_bindings,2);
-        SDL_BindGPUIndexBuffer(geometry_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_32BIT);
-
-        SDL_DrawGPUIndexedPrimitives(render_pass,mesh.indices.size(),transforms.size(),0,0,0);
-
-    }
-
-    SDL_EndGPURenderPass(geometry_pass);
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
@@ -1192,7 +1206,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_ReleaseGPUBuffer(device, index_buffer);
     SDL_ReleaseGPUBuffer(device,vertex_buffer);
     SDL_ReleaseGPUSampler(device,sampler);
-    SDL_ReleaseGPUTexture(device, texture);
    SDL_ReleaseGPUTexture(device, depth_texture);
 
     SDL_ReleaseGPUGraphicsPipeline(device,grid_pipeline);
