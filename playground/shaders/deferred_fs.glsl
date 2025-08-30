@@ -19,14 +19,20 @@ struct Light {
     float outer_cutoff;
     vec3 padding;
 };
-/*
-layout(std140, set = 3, binding = 0) uniform NumLights   {
+
+layout(std140, set = 3, binding = 0) uniform CameraPosition   {
+    vec3 view_position;
+};
+
+layout(std140, set = 3, binding = 1) uniform NumLights   {
     int num_lights;
 };
 
-layout (std140, set=3, binding=1) uniform SceneLights{
+layout (std140, set=3, binding=2) uniform SceneLights{
     Light lights[MAX_LIGHTS];
 };
+
+/*
 layout (std140, set=3, binding=3) uniform DebugColor{
     vec4 debug_color;
 };
@@ -51,14 +57,14 @@ vec3 CalculateDirectional(Light directional, vec3 normal, vec3 view,float shine)
 
     vec3 ambient = directional.ambient * vec3(texture(albedo_texture,texcoord).rgb);
     vec3 diffuse = directional.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = directional.specular*  spec *texture(metallic_texture,texcoord).r;
+    vec3 specular = directional.specular*  spec *2.0;
+
     return (ambient+diffuse+specular);
 }
 
-vec3 CalculatePointLight(Light point_light,mat3 btn_matrix, vec3 normal, vec3 view,vec3 frag_position,float shine)
+vec3 CalculatePointLight(Light point_light, vec3 normal, vec3 view,vec3 frag_position,float shine)
 {
-    vec3 direction_to_light =normalize(point_light.direction - frag_position);
-    vec3 light_direction= normalize(point_light.position  - frag_position);
+    vec3 light_direction= normalize(point_light.position-frag_position);
 
     float diff = max(dot(normal,light_direction),0.0);
 
@@ -66,13 +72,13 @@ vec3 CalculatePointLight(Light point_light,mat3 btn_matrix, vec3 normal, vec3 vi
 
     float spec = pow(dot(view,reflection_direction),shine);
 
-    float distance = length(point_light.position - frag_position);
+    float distance = length(point_light.position- frag_position);
 
-    float attenuation = 1.0/point_light.constant+point_light.linear*distance+point_light.quadratic*(distance*distance);
-
+    //float attenuation = 1.0/(point_light.constant+(point_light.linear*distance)+(point_light.quadratic*(distance*distance)));
+    float attenuation = 1.0/(1.0+(0.09*distance)+(0.032*(distance*distance)));
     vec3 ambient = point_light.ambient * vec3(texture(albedo_texture,texcoord).rgb);
     vec3 diffuse = point_light.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = point_light.specular *  spec * vec3(texture(metallic_texture,texcoord).r);
+    vec3 specular = point_light.specular *  spec * texture(metallic_texture,texcoord).b;
 
     ambient *= attenuation;
     diffuse *= attenuation;
@@ -106,13 +112,15 @@ vec3 CalculateSpotlight(Light spotlight, vec3 direction_to_light, vec3 normal, v
 
 void main()
 {
-    /*
-    vec3 normal = texture(normal_map, texcoord).rgb;
-    normal = normal*2.0+1.0;
-    normal = normalize(btn_matrix*normal);
 
-    //vec3 light_direction = btn_matrix*normalize(lights[0].direction -fragment_position);
-    vec3 view_direction = btn_matrix*normalize(view_position-fragment_position);
+    vec3 normal = texture(normal_map,texcoord).rgb;
+    vec3 fragment_position = texture(position_texture,texcoord).rgb;
+    vec3 albedo = texture(albedo_texture, texcoord).rgb;
+
+    vec3 view_direction =normalize(view_position-fragment_position);
+
+
+
 
 
     vec3 light_output = vec3(0.0,0.0,0.0);
@@ -120,26 +128,33 @@ void main()
     for(int i = 0; i < num_lights; i++)
     {
         Light light = lights[i];
-        vec3 light_direction = btn_matrix * normalize(light.position -fragment_position);
+        vec3 light_direction = normalize(light.position - fragment_position);
         vec3 half_way = normalize(light_direction + view_direction);
+
+        if (light.type == 0)
+        {
+            light_output += CalculateDirectional(light, normal, view_direction, 8.0);
+        }
+        else {
+           // light_output += CalculatePointLight(light, normal, view_direction, fragment_position, 32);
+        }/*
         switch(light.type){
             case 0:
-                    light_output +=CalculateDirectional(light,normal,view_direction,32);
+                    light_output +=CalculateDirectional(light,normal,view_direction,8.0);
             case 1:
                     light_output +=CalculateSpotlight(light, light_direction, normal, view_direction,32);
-        }
+            case 2:
+                    light_output +=CalculatePointLight(light, normal, view_direction,fragment_position, 32);
+             }*/
     }
 
 
     //FragColor = vec4((ambient+diffuse+specular)*albedo.rgb,1.0);
-
-    vec3 ambient = texture(albedo_texture,texcoord).rgb;
-
     FragColor = vec4(light_output,1.0);
-
-   // FragColor = vec4(normalize(light_output),1.0);
-*/
-    FragColor = vec4(texture(albedo_texture,texcoord).rgb,1.0);
+    vec3 halfway = (normal + fragment_position)/2.0;
+    FragColor = vec4(halfway,1.0);
+    //FragColor = vec4(fragment_position.xyz*0.1,1.0);
+    //FragColor = vec4(albedo,1.0);
     //FragColor = vec4(1.0,0.0,0.0,1.0);
   // FragColor = vec4(1.0,1.0,1.0,1.0);
 }

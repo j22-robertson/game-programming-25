@@ -21,18 +21,20 @@ layout (location = 8) in vec4 model_matrix_w;
 
 layout (location = 0) out vec2 texcoord;
 layout (location = 1) out mat3 btn_matrix;
-layout (location = 4) out vec3 view_position;
-layout (location = 5) out vec3 fragment_position;
+layout (location = 4) out vec3 fragment_position;
 
 void main() {
     mat4 model_matrix = mat4(model_matrix_x, model_matrix_y, model_matrix_z, model_matrix_w);
-    vec3 tangent = normalize(vec3(model_matrix*vec4(a_tangent,0.0)));
-    vec3 bitangent = normalize(vec3(model_matrix*vec4(a_bitangent,0.0)));
-    vec3 normal = normalize(vec3(model_matrix*vec4(a_normal,0.0)));
+
+    mat3 normal_matrix = mat3(inverse(transpose(model_matrix)));
+    vec3 tangent = normalize(vec3(normal_matrix*a_tangent));
+    vec3 bitangent = normalize(vec3(normal_matrix*a_bitangent));
+    vec3 normal = normalize(vec3(normal_matrix*a_normal));
+
 
     mat3 TBN = mat3(tangent,bitangent,normal);
     btn_matrix = TBN;
     gl_Position =camera.projection*camera.view * model_matrix * vec4(a_position.xyz, 1.0);
-    fragment_position = vec3(model_matrix*vec4(a_position,1.0));
+    fragment_position = vec3(model_matrix*vec4(a_position.xyz,1.0));
     texcoord= a_tex;
 }

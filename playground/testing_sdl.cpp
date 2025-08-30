@@ -221,7 +221,7 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
     std::vector<glm::vec4> texture_data;
     auto texture_size = width*height;
     for (int i = 0; i < texture_size; i++) {
-        texture_data.push_back(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+        texture_data.emplace_back(0.0f, 0.0f, 0.0f, 0.0f);
     }
 
 
@@ -230,15 +230,15 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
     texture_info.layer_count_or_depth = 1;
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
     texture_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     texture_info.num_levels = 1;
+    texture_info.format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
 
    // auto* texture = SDL_CreateGPUTexture(device, &texture_info);
     texture = SDL_CreateGPUTexture(device, &texture_info);
 
     SDL_GPUTransferBufferCreateInfo buffer_info{};
     buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
-    buffer_info.size = static_cast<std::uint32_t>(4 * width * height);
+    buffer_info.size = sizeof(glm::vec4)* width * height;
     buffer_info.props = 0;
 
 
@@ -272,7 +272,7 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
 
     void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,false);
 
-    SDL_memcpy(mapped_data, texture_data.data(), 4*width*height);
+    SDL_memcpy(mapped_data, texture_data.data(), sizeof(glm::vec4)*width*height);
 
     SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
 
@@ -413,19 +413,19 @@ void Load_GeometryPipeline(SDL_GPUDevice* device) {
     geometry_pipeline_info.vertex_input_state.num_vertex_attributes=9;
     geometry_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
 
-    geometry_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    geometry_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
     geometry_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[4];
 
     color_target_descriptions[0] = {};
-    color_target_descriptions[0].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    color_target_descriptions[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
     color_target_descriptions[1] = {};
-    color_target_descriptions[1].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    color_target_descriptions[1].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
     color_target_descriptions[2] = {};
-    color_target_descriptions[2].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    color_target_descriptions[2].format =SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
     color_target_descriptions[3] = {};
-    color_target_descriptions[3].format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
+    color_target_descriptions[3].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
 
 
 
@@ -464,7 +464,6 @@ void Update_Camera(CameraUniform& camera_uniform) {
     camera_uniform.position = camera.position;
     camera_uniform.projection = glm::perspective(glm::radians(70.0f), (float)960 / (float)540, 0.1f, 1000.0f);
 
-    scene_lights[1].position = camera.position;
     camera_uniform.projection[1][1] *= -1;
 }
 
@@ -542,7 +541,7 @@ void Load_GridPipeline(SDL_GPUDevice* device) {
     SDL_GPUColorTargetDescription color_target_descriptions[1];
 
     color_target_descriptions[0] = {};
-    color_target_descriptions[0].format = SDL_GetGPUSwapchainTextureFormat(device, window);
+    color_target_descriptions[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
 
     color_target_descriptions[0].blend_state.enable_blend = true;
     color_target_descriptions[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
@@ -679,18 +678,26 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     directional_light.ambient = glm::vec3(1.0,1.0,1.0);
     directional_light.specular = glm::vec3(1.0,1.0,1.0);
     directional_light.diffuse = glm::vec3(1.0,1.0,1.0);
-    directional_light.direction = glm::vec3(3.0,40.0,3.0);
+    directional_light.direction = glm::vec3(-1.0,-1.0,-1.0);
+    directional_light.cutoff = glm::cos(glm::radians(12.5f));
+    directional_light.outer_cutoff = glm::cos(glm::radians(17.0f));
+    directional_light.constant = 1.0f;
+    directional_light.linear = 0.09f;
+    directional_light.quadratic = 0.032f;
     scene_lights.push_back(directional_light);
 
     Light spotlight = {};
-    spotlight.type =1;
-    spotlight.position = glm::vec3(-1.0,0.0,0.0);
+    spotlight.type =2;
+    spotlight.position = glm::vec3(30.0,10.0,20.0);
     spotlight.ambient = glm::vec3(1.0,1.0,1.0);
     spotlight.specular = glm::vec3(1.0,1.0,1.0);
     spotlight.diffuse = glm::vec3(1.0,1.0,1.0);
     spotlight.direction = glm::vec3(1.0,0.0,0.0);
     spotlight.cutoff = glm::cos(glm::radians(12.5f));
     spotlight.outer_cutoff = glm::cos(glm::radians(17.0f));
+    spotlight.constant = 1.0f;
+    spotlight.linear = 0.09f;
+    spotlight.quadratic = 0.032f;
     scene_lights.push_back(spotlight);
 
 
@@ -777,7 +784,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     fragment_shader_info.num_samplers = 4;
     fragment_shader_info.num_storage_buffers = 0;
     fragment_shader_info.num_storage_textures = 0;
-    fragment_shader_info.num_uniform_buffers = 0;
+    fragment_shader_info.num_uniform_buffers = 3;
     fragment_shader = SDL_CreateGPUShader(device, &fragment_shader_info);
 
     SDL_free(fragment_code);
@@ -886,7 +893,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     Transform transform{};
     transform.Get_Scale()= glm::vec3(1.0,1.0,1.0);
-    transform.Get_Position() = glm::vec3(0.0,0.0,0.0);
+    transform.Get_Position() = glm::vec3(1.0,1.0,1.0);
 
     Transform test_transform{};
     test_transform.Get_Scale()= glm::vec3(2.0,2.0,2.0);
@@ -943,7 +950,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         return SDL_APP_CONTINUE;
     }
 
-
+    Update_InstanceBuffer();
 
     SDL_GPUColorTargetInfo color_target_info[4];
     color_target_info[0] = SDL_GPUColorTargetInfo{};
@@ -1103,15 +1110,23 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     texture_sampler_binding[0].sampler = sampler;
     texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
     texture_sampler_binding[1].sampler = sampler;
-    texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();
+    texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
 
     texture_sampler_binding[2].sampler = sampler;
-    texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
+    texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();
 
     texture_sampler_binding[3].sampler = sampler;
     texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
 
+
+
+    std::int32_t num_lights = scene_lights.size();
+
     SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::int32_t));
+    SDL_PushGPUFragmentUniformData(command_buffer,2,scene_lights.data(),sizeof(Light)*scene_lights.size());
+
+
     SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
 
 
