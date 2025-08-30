@@ -973,8 +973,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_SetGPUScissor(geometry_pass,&scissor);
     SDL_SetGPUViewport(geometry_pass,&viewport);
 
+    SDL_BindGPUGraphicsPipeline(geometry_pass,grid_pipeline);
+    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform, sizeof(CameraUniform));
+    SDL_DrawGPUPrimitives(geometry_pass,6,1,0,0);
 
     SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
+
+
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
     for (const auto& mesh : models["CUBE"].mesh_storage) {
         SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
@@ -1109,9 +1114,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
     SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
 
-
-
-    // DRAW HERE
 
     SDL_EndGPURenderPass(render_pass);
 
