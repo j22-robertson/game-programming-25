@@ -3,8 +3,8 @@ layout (location = 0) in vec2 texcoord;
 layout (location = 1) in mat3 btn_matrix;
 layout (location = 5) in vec3 fragment_position;
 
-layout(location=0) out vec4 frag_position;
-layout(location =1) out vec4 frag_albedo;
+layout(location=0) out vec4 frag_albedo;
+layout(location =1) out vec4 frag_position;
 layout(location=2) out vec4 frag_normal;
 layout(location =3) out vec4 frag_metallic_roughness;
 
@@ -20,8 +20,8 @@ void main() {
     normal = normalize(btn_matrix*normal);
     //vec3 view_direction = btn_matrix*normalize(view_position-fragment_position);
 
-    frag_position=vec4(fragment_position.xyz,0.0);
-    frag_albedo = vec4(texture(albedo_texture, texcoord));
-    frag_normal = vec4(normal.xyz,0.0);
-    frag_metallic_roughness = vec4(texture(metallic_texture,texcoord).b,texture(roughness_texture,texcoord).r,0.0,0.0);
+    frag_position=normalize(vec4(btn_matrix*fragment_position.xyz,1.0));
+    frag_albedo = vec4(texture(albedo_texture, texcoord).rgb,1.0);
+    frag_normal = vec4(normal.xyz,1.0);
+    frag_metallic_roughness = vec4(texture(metallic_texture,texcoord).b,texture(roughness_texture,texcoord).r,0.0,1.0);
 }

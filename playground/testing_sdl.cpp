@@ -229,7 +229,7 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
     texture_info.height = height;
     texture_info.layer_count_or_depth = 1;
     texture_info.type = SDL_GPU_TEXTURETYPE_2D;
-    texture_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+    texture_info.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
     texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB;
     texture_info.num_levels = 1;
 
@@ -413,7 +413,7 @@ void Load_GeometryPipeline(SDL_GPUDevice* device) {
     geometry_pipeline_info.vertex_input_state.num_vertex_attributes=9;
     geometry_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
 
-    geometry_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    geometry_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     geometry_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[4];
@@ -790,7 +790,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     graphics_pipeline_info.vertex_shader = vertex_shader;
     graphics_pipeline_info.fragment_shader = fragment_shader;
 
-    graphics_pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    graphics_pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLESTRIP;
+
 /*
     SDL_GPUVertexBufferDescription vertex_buffer_descriptions[2];
 
@@ -860,7 +861,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     graphics_pipeline_info.vertex_input_state.num_vertex_attributes=0;
     graphics_pipeline_info.vertex_input_state.vertex_attributes = nullptr;
 
-    graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    graphics_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     graphics_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[1];
@@ -951,18 +952,17 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     color_target_info[0].store_op = SDL_GPU_STOREOP_STORE;
     color_target_info[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
     color_target_info[1] = SDL_GPUColorTargetInfo{};
-    color_target_info[1].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[1].clear_color = {0.f, 0.0f,0.0f, 0.0f};
     color_target_info[1].load_op = SDL_GPU_LOADOP_CLEAR;
     color_target_info[1].store_op = SDL_GPU_STOREOP_STORE;
     color_target_info[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
     color_target_info[2] = SDL_GPUColorTargetInfo{};
-    color_target_info[2].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[2].clear_color = {0.0f, 0.0f,0.0f, 0.0f};
     color_target_info[2].load_op = SDL_GPU_LOADOP_CLEAR;
     color_target_info[2].store_op = SDL_GPU_STOREOP_STORE;
     color_target_info[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();;
     color_target_info[3] = SDL_GPUColorTargetInfo{};
-
-    color_target_info[3].clear_color = {0.f, 0.0f,0.0f, .0f};
+    color_target_info[3].clear_color = {0.0f, 0.0f,0.0f, 0.0f};
     color_target_info[3].load_op = SDL_GPU_LOADOP_CLEAR;
     color_target_info[3].store_op = SDL_GPU_STOREOP_STORE;
     color_target_info[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
@@ -1025,11 +1025,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_SetGPUScissor(render_pass,&scissor);
     SDL_SetGPUViewport(render_pass,&viewport);
 
-    SDL_BindGPUGraphicsPipeline(render_pass,grid_pipeline);
-    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
-    //SDL_PushGPUVertexUniformData()
 
-    SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
+
 
 /*
     SDL_BindGPUGraphicsPipeline(render_pass,graphics_pipeline);
@@ -1093,22 +1090,23 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     current_model=0;
 
 */
+
+
     SDL_BindGPUGraphicsPipeline(render_pass,graphics_pipeline);
     SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
 
     texture_sampler_binding[0].sampler = sampler;
-    texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();
+    texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
     texture_sampler_binding[1].sampler = sampler;
-    texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
+    texture_sampler_binding[1].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_POSITION)->Get_GPUTexture();
 
     texture_sampler_binding[2].sampler = sampler;
-    texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_ALBEDO)->Get_GPUTexture();
+    texture_sampler_binding[2].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_NORMAL)->Get_GPUTexture();
 
     texture_sampler_binding[3].sampler = sampler;
     texture_sampler_binding[3].texture = graphics_resources.texture_map.Get_Resource(GBUFFER_METALLICROUGHNESS)->Get_GPUTexture();
 
     SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
-
     SDL_DrawGPUPrimitives(render_pass,6,1,0,0);
 
 

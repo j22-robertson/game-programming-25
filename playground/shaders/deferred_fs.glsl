@@ -36,7 +36,7 @@ const vec2 resolution = vec2(960,540);
 
 layout(set=2, binding=0)uniform sampler2D albedo_texture;
 layout(set=2, binding=1)uniform sampler2D normal_map;
-layout(set=2, binding=2)uniform sampler2D roughness_texture;
+layout(set=2, binding=2)uniform sampler2D position_texture;
 layout(set=2, binding=3)uniform sampler2D metallic_texture;
 
 vec3 CalculateDirectional(Light directional, vec3 normal, vec3 view,float shine)
@@ -139,6 +139,7 @@ void main()
 
    // FragColor = vec4(normalize(light_output),1.0);
 */
-    FragColor = vec4(texture(normal_map,texcoord).rgb,1.0);
+    FragColor = vec4(texture(albedo_texture,texcoord).rgb,1.0);
+    //FragColor = vec4(1.0,0.0,0.0,1.0);
   // FragColor = vec4(1.0,1.0,1.0,1.0);
 }
