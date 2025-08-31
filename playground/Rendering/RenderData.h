@@ -30,18 +30,13 @@ enum LightType : std::int32_t {
 };
 
 struct Light {
-    std::int32_t type;
-    glm::vec3 position = glm::vec3(0.0f);
-    glm::vec3 ambient = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 diffuse = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 direction = glm::vec3(0.0f, 0.0f, 0.0f);
-    float constant = 1.0f;
-    float linear = 0.9f;
-    float quadratic = 0.032f;
-    float cutoff= glm::cos(glm::radians(12.5f));
-    float outer_cutoff = 0.0f;
-    glm::vec3 padding = glm::vec3(0.0f);
+    glm::vec4 position= glm::vec4(0.0f);
+    glm::vec4 ambient = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
+    glm::vec4 diffuse = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
+    glm::vec4 specular = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
+    glm::vec4 direction = glm::vec4(0.0f, 0.0f, 0.0f,0.0);
+    glm::vec4 attenuation_factors= glm::vec4(1.0f, 0.09f, 0.032f,0.0);
+    glm::vec4 spotlight_parameters = glm::vec4(0);
 };
 
 

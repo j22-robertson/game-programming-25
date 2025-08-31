@@ -673,31 +673,29 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
     Light directional_light = {};
-    directional_light.type = 0;
-    directional_light.position = glm::vec3(3.0,9.0,3.0);
-    directional_light.ambient = glm::vec3(1.0,1.0,1.0);
-    directional_light.specular = glm::vec3(1.0,1.0,1.0);
-    directional_light.diffuse = glm::vec3(1.0,1.0,1.0);
-    directional_light.direction = glm::vec3(-1.0,-1.0,-1.0);
-    directional_light.cutoff = glm::cos(glm::radians(12.5f));
-    directional_light.outer_cutoff = glm::cos(glm::radians(17.0f));
-    directional_light.constant = 1.0f;
-    directional_light.linear = 0.09f;
-    directional_light.quadratic = 0.032f;
+    directional_light.position= glm::vec4(3.0,9.0,3.0,0.0);
+    directional_light.ambient = glm::vec4(1.0,1.0,1.0,0.0);
+    directional_light.specular = glm::vec4(1.0,1.0,1.0,0.0);
+    directional_light.diffuse = glm::vec4(1.0,1.0,1.0,0.0);
+    directional_light.direction = glm::vec4(1.0,1.0,1.0,0.0);
+    directional_light.spotlight_parameters.x = glm::cos(glm::radians(12.5f));
+    directional_light.spotlight_parameters.y = glm::cos(glm::radians(17.0f));
+    directional_light.attenuation_factors.x = 1.0f;
+    directional_light.attenuation_factors.y = 0.09f;
+    directional_light.attenuation_factors.z = 0.032f;
     scene_lights.push_back(directional_light);
 
     Light spotlight = {};
-    spotlight.type =2;
-    spotlight.position = glm::vec3(30.0,10.0,20.0);
-    spotlight.ambient = glm::vec3(1.0,1.0,1.0);
-    spotlight.specular = glm::vec3(1.0,1.0,1.0);
-    spotlight.diffuse = glm::vec3(1.0,1.0,1.0);
-    spotlight.direction = glm::vec3(1.0,0.0,0.0);
-    spotlight.cutoff = glm::cos(glm::radians(12.5f));
-    spotlight.outer_cutoff = glm::cos(glm::radians(17.0f));
-    spotlight.constant = 1.0f;
-    spotlight.linear = 0.09f;
-    spotlight.quadratic = 0.032f;
+    spotlight.position = glm::vec4(3.0,3.0,3.0,2.0);
+    spotlight.ambient = glm::vec4(1.0,1.0,1.0,0.0);
+    spotlight.specular = glm::vec4(1.0,0.0,0.0,0.0);
+    spotlight.diffuse = glm::vec4(1.0,1.0,1.0,0.0);
+    spotlight.direction = glm::vec4(1.0,1.0,1.0,0.0);
+    spotlight.spotlight_parameters.x= glm::cos(glm::radians(12.5f));
+    spotlight.spotlight_parameters.y = glm::cos(glm::radians(17.0f));
+    spotlight.attenuation_factors.x = 1.0f;
+    spotlight.attenuation_factors.y = 0.09f;
+    spotlight.attenuation_factors.z = 0.032f;
     scene_lights.push_back(spotlight);
 
 
@@ -1120,10 +1118,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
 
 
-    std::int32_t num_lights = scene_lights.size();
+    std::int64_t num_lights = scene_lights.size();
 
     SDL_BindGPUFragmentSamplers(render_pass,0,texture_sampler_binding,4);
-    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::int32_t));
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &num_lights, sizeof(std::int64_t));
     SDL_PushGPUFragmentUniformData(command_buffer,2,scene_lights.data(),sizeof(Light)*scene_lights.size());
 
 

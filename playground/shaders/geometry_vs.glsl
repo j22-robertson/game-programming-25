@@ -34,7 +34,8 @@ void main() {
 
     mat3 TBN = mat3(tangent,bitangent,normal);
     btn_matrix = TBN;
-    gl_Position =camera.projection*camera.view * model_matrix * vec4(a_position.xyz, 1.0);
     fragment_position = vec3(model_matrix*vec4(a_position.xyz,1.0));
+    gl_Position =camera.projection*camera.view * model_matrix * vec4(fragment_position, 1.0);
+
     texcoord= a_tex;
 }

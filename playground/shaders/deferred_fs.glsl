@@ -6,18 +6,13 @@ layout (location = 0) in vec2 texcoord;
 layout (location = 0) out vec4 FragColor;
 
 struct Light {
-    int type;
-    vec3 position;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 direction;
-    float constant;
-    float linear;
-    float quadratic;
-    float cutoff;
-    float outer_cutoff;
-    vec3 padding;
+    vec4 position;
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    vec4 direction;
+    vec4 attenuation_factors;
+    vec4 spotlight_parameters;
 };
 
 layout(std140, set = 3, binding = 0) uniform CameraPosition   {
@@ -47,7 +42,7 @@ layout(set=2, binding=3)uniform sampler2D metallic_texture;
 
 vec3 CalculateDirectional(Light directional, vec3 normal, vec3 view,float shine)
 {
-    vec3 light_direction = normalize(-directional.direction);
+    vec3 light_direction = normalize(-directional.direction.xyz);
 
     float diff=max(dot(normal,light_direction),0.0);
 
@@ -55,30 +50,30 @@ vec3 CalculateDirectional(Light directional, vec3 normal, vec3 view,float shine)
 
     float spec = pow(max(dot(view,reflection_direction),0.0),shine);
 
-    vec3 ambient = directional.ambient * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 diffuse = directional.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = directional.specular*  spec *2.0;
+    vec3 ambient = directional.ambient.rgb * vec3(texture(albedo_texture,texcoord).rgb);
+    vec3 diffuse = directional.diffuse.rgb * diff * vec3(texture(albedo_texture,texcoord).rgb);
+    vec3 specular = directional.specular.rgb*  spec * vec3(texture(metallic_texture,texcoord).b);
 
     return (ambient+diffuse+specular);
 }
 
 vec3 CalculatePointLight(Light point_light, vec3 normal, vec3 view,vec3 frag_position,float shine)
 {
-    vec3 light_direction= normalize(point_light.position-frag_position);
+    vec3 light_direction= normalize(point_light.position.xyz-frag_position);
 
     float diff = max(dot(normal,light_direction),0.0);
 
     vec3 reflection_direction = reflect(-light_direction,normal);
 
-    float spec = pow(dot(view,reflection_direction),shine);
+    float spec = pow(max(dot(view,reflection_direction),0.0),shine);
 
-    float distance = length(point_light.position- frag_position);
+    float distance = length(point_light.position.xyz-frag_position);
 
-    //float attenuation = 1.0/(point_light.constant+(point_light.linear*distance)+(point_light.quadratic*(distance*distance)));
-    float attenuation = 1.0/(1.0+(0.09*distance)+(0.032*(distance*distance)));
-    vec3 ambient = point_light.ambient * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 diffuse = point_light.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = point_light.specular *  spec * texture(metallic_texture,texcoord).b;
+    //float attenuation = 1.0/(1.0f+(0.09f*distance)+(0.032f*(distance*distance)));
+   float attenuation = 1.0/(point_light.attenuation_factors.x+(point_light.attenuation_factors.y*distance)+(point_light.attenuation_factors.z*(distance*distance)));
+    vec3 ambient = point_light.ambient.rgb * vec3(texture(albedo_texture,texcoord).rgb);
+    vec3 diffuse = point_light.diffuse.rgb * diff * vec3(texture(albedo_texture,texcoord).rgb);
+    vec3 specular = point_light.specular.rgb *  spec * vec3(texture(metallic_texture,texcoord).b);
 
     ambient *= attenuation;
     diffuse *= attenuation;
@@ -89,19 +84,19 @@ vec3 CalculatePointLight(Light point_light, vec3 normal, vec3 view,vec3 frag_pos
 
 vec3 CalculateSpotlight(Light spotlight, vec3 direction_to_light, vec3 normal, vec3 view, float shine)
 {
-    float theta = dot(direction_to_light, normalize(-spotlight.direction));
-    float epsilon = spotlight.cutoff - spotlight.outer_cutoff;
-    float intensity = clamp((theta-spotlight.outer_cutoff)/epsilon,0.0,1.0);
+    float theta = dot(direction_to_light, normalize(-spotlight.direction.xyz));
+    float epsilon = spotlight.spotlight_parameters.x - spotlight.spotlight_parameters.y;
+    float intensity = clamp((theta-spotlight.spotlight_parameters.y)/epsilon,0.0,1.0);
     float diff = max(dot(normal,direction_to_light),0.0);
 
     vec3 reflection_direction = reflect(-direction_to_light,normal);
     float spec = pow(dot(view,reflection_direction),shine);
 
-    vec3 diffuse = spotlight.diffuse * diff * vec3(texture(albedo_texture,texcoord).rgb);
-    vec3 specular = spotlight.specular *  spec * vec3(texture(metallic_texture,texcoord).rgb);
+    vec3 diffuse = spotlight.diffuse.rgb * diff * vec3(texture(albedo_texture,texcoord).rgb);
+    vec3 specular = spotlight.specular.rgb *  spec * vec3(texture(metallic_texture,texcoord).b);
     vec3 ambient = texture(albedo_texture, texcoord).rgb;
 
-    if(theta>spotlight.cutoff)
+    if(theta>spotlight.spotlight_parameters.x)
     {
         diffuse *= intensity;
         specular *= intensity;
@@ -121,22 +116,20 @@ void main()
 
 
 
-
-
     vec3 light_output = vec3(0.0,0.0,0.0);
 
     for(int i = 0; i < num_lights; i++)
     {
         Light light = lights[i];
-        vec3 light_direction = normalize(light.position - fragment_position);
+        vec3 light_direction = normalize(light.position.xyz - fragment_position);
         vec3 half_way = normalize(light_direction + view_direction);
 
-        if (light.type == 0)
+        if (light.position.w == 0)
         {
-            light_output += CalculateDirectional(light, normal, view_direction, 8.0);
+           light_output += CalculateDirectional(light, normal, view_direction, 8.0);
         }
         else {
-           // light_output += CalculatePointLight(light, normal, view_direction, fragment_position, 32);
+          light_output += CalculatePointLight(light, normal, view_direction, fragment_position, 32.0);
         }/*
         switch(light.type){
             case 0:
@@ -151,8 +144,6 @@ void main()
 
     //FragColor = vec4((ambient+diffuse+specular)*albedo.rgb,1.0);
     FragColor = vec4(light_output,1.0);
-    vec3 halfway = (normal + fragment_position)/2.0;
-    FragColor = vec4(halfway,1.0);
     //FragColor = vec4(fragment_position.xyz*0.1,1.0);
     //FragColor = vec4(albedo,1.0);
     //FragColor = vec4(1.0,0.0,0.0,1.0);
