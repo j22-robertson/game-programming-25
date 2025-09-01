@@ -141,11 +141,6 @@ void main()
              }*/
     }
 
-
-    //FragColor = vec4((ambient+diffuse+specular)*albedo.rgb,1.0);
     FragColor = vec4(light_output,1.0);
-    //FragColor = vec4(fragment_position.xyz*0.1,1.0);
-    //FragColor = vec4(albedo,1.0);
-    //FragColor = vec4(1.0,0.0,0.0,1.0);
-  // FragColor = vec4(1.0,1.0,1.0,1.0);
+
 }
