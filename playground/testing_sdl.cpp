@@ -83,6 +83,8 @@ std::uint32_t GBUFFER_ALBEDO;
 std::uint32_t GBUFFER_NORMAL;
 std::uint32_t GBUFFER_METALLICROUGHNESS;
 
+std::uint32_t DEBUG_TEXTURE;
+
 SDL_Window* window = nullptr;
 SDL_GPUDevice* device = nullptr;
 
@@ -290,6 +292,88 @@ std::uint32_t Load_GBufferTexture(SDL_GPUDevice* device, std::string& name) {
 
     return graphics_resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),name);
 }
+
+
+std::uint32_t Load_DebugTexture(SDL_GPUDevice* device) {
+
+    int width, height, channels;
+
+    width = 960;
+    height = 540;
+
+    SDL_GPUTextureCreateInfo texture_info{};
+    std::vector<glm::vec4> texture_data;
+    auto texture_size = width*height;
+    for (int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            texture_data.emplace_back(i/width, 0.0f, j/height, 0.0f);
+        }
+    }
+
+
+    texture_info.width = width;
+    texture_info.height = height;
+    texture_info.layer_count_or_depth = 1;
+    texture_info.type = SDL_GPU_TEXTURETYPE_2D;
+    texture_info.usage =  SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    texture_info.num_levels = 1;
+    texture_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+
+   // auto* texture = SDL_CreateGPUTexture(device, &texture_info);
+    texture = SDL_CreateGPUTexture(device, &texture_info);
+
+    SDL_GPUTransferBufferCreateInfo buffer_info{};
+    buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    buffer_info.size = sizeof(glm::vec4)* width * height;
+    buffer_info.props = 0;
+
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+    SDL_GPUCopyPass* image_copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+
+    auto* transfer_buffer = SDL_CreateGPUTransferBuffer(device, &buffer_info);
+
+
+
+
+    SDL_GPUTextureTransferInfo transfer_info{};
+    transfer_info.transfer_buffer = transfer_buffer;
+    transfer_info.pixels_per_row = width;
+    transfer_info.offset = 0;
+    transfer_info.rows_per_layer = 1;
+
+
+    SDL_GPUTextureRegion texture_region{};
+    texture_region.texture = texture;
+    texture_region.d = 0;
+    texture_region.h = height;
+    texture_region.w = width;
+    texture_region.layer = 0;
+    texture_region.mip_level = 0;
+    texture_region.x=0;
+    texture_region.y=0;
+    texture_region.z=0;
+
+    void* mapped_data = SDL_MapGPUTransferBuffer(device, transfer_buffer,false);
+
+    SDL_memcpy(mapped_data, texture_data.data(), sizeof(glm::vec4)*width*height);
+
+    SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
+
+
+    SDL_UploadToGPUTexture(image_copy_pass,&transfer_info,&texture_region, true);
+    SDL_EndGPUCopyPass(image_copy_pass);
+
+    SDL_ReleaseGPUTransferBuffer(device, transfer_buffer);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+    std::string name = "DEBUG_TEXTURE";
+    return graphics_resources.texture_map.Insert_Resource(std::unique_ptr<GPUTexture, ResourceDeleter<GPUTexture>>(new GPUTexture(texture),ResourceDeleter<GPUTexture>(device)),name);
+}
+
+
 
 void Initialize_GBuffer(SDL_GPUDevice* device) {
     std::string gbuffer_position = "GBUFFER_POSITION";
@@ -850,14 +934,18 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
    // Mesh_UploadToGPU(device, cube_vertices,cube_indices);
 
     SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
-    std::map<std::string, std::unique_ptr<Texture2D>> texture_map;
+
+    DEBUG_TEXTURE = Load_DebugTexture(device);
+    Model debug_light_model = Load_ModelFromFileWithTexture(device,command_buffer,"../playground/Models/cubic.obj",graphics_resources,DEBUG_TEXTURE);
+
+    models.insert(std::pair("DEBUG",debug_light_model));
     Model model = Load_ModelDataFromFile(device,
         command_buffer ,
         "../playground/Models/ornate_mirror/scene.gltf",
         graphics_resources);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
-    models.insert(std::pair("CUBE",model));
+    models.insert(std::pair("MIRROR",model));
 /*
     while (!unloaded_models.empty()) {
         auto unloaded_model = unloaded_models.front();
@@ -1051,7 +1139,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
 
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
-    for (const auto& mesh : models["CUBE"].mesh_storage) {
+    for (const auto& mesh : models["MIRROR"].mesh_storage) {
         SDL_GPUTextureSamplerBinding texture_sampler_binding[4]{};
         texture_sampler_binding[0].sampler = sampler;
         texture_sampler_binding[0].texture = graphics_resources.texture_map.Get_Resource(mesh.material.albedo)->Get_GPUTexture();

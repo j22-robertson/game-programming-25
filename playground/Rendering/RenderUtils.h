@@ -322,7 +322,45 @@ inline Model Load_ModelDataFromFile(SDL_GPUDevice* device,SDL_GPUCommandBuffer* 
 
     Model loaded_model{.mesh_storage = loaded_meshes};
     return loaded_model;
-    // return indices.size();
+}
+
+inline void Process_NodeWithTexture(SDL_GPUDevice* device, SDL_GPUCommandBuffer* command_buffer,const std::string& directory,aiNode* node, const aiScene* scene, std::vector<Mesh>& meshes, GraphicsResources& resources,std::uint32_t& step_count,const std::uint32_t& tex_id) {
+    for (int i = 0; i < node->mNumMeshes; i++) {
+        std::uint32_t mesh_index = node->mMeshes[i];
+        aiMesh* mesh = scene->mMeshes[mesh_index];
+        auto& mesh_to_load = meshes.emplace_back(Process_Mesh(mesh, scene, resources));
+
+        mesh_to_load.material.albedo = tex_id;
+        std::string step = "step:"+std::to_string(step_count);
+        std::string node_name =node->mName.C_Str();
+        Mesh_UploadToGPU(device, command_buffer, resources, mesh_to_load, mesh->mName.C_Str()+node_name+std::to_string(i)+=step);
+    }
+    step_count+=1;
+    for (int i = 0; i < node->mNumChildren; i++) {
+        Process_NodeWithTexture(device, command_buffer,directory,node->mChildren[i], scene, meshes,resources ,step_count,tex_id);
+    }
+}
+
+
+inline Model Load_ModelFromFileWithTexture(SDL_GPUDevice* device,SDL_GPUCommandBuffer* command_buffer,const std::string& filename,GraphicsResources& resources,const std::uint32_t& tex_id) {
+    std::vector<Mesh> loaded_meshes;
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate |aiProcess_CalcTangentSpace|aiProcess_FlipUVs );
+
+
+    auto& node = scene->mRootNode;
+    std::uint32_t mesh_count = 0;
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !node){
+        SDL_Log(std::string("ERROR::ASIMP::").append(importer.GetErrorString()).c_str());
+    }
+
+    std::string directory = filename.substr(0, filename.find_last_of("/"));
+    //TODO: Load material data into material structures stored in global material map with identifiers. Give mesh the material indices.
+    std::uint32_t step_count=0;
+    Process_NodeWithTexture(device,command_buffer,directory,node, scene, loaded_meshes,resources,step_count,tex_id);
+
+    Model loaded_model{.mesh_storage = loaded_meshes};
+    return loaded_model;
 }
 
 #endif //GP25_EXERCISES_RENDERUTILS_H
