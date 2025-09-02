@@ -127,6 +127,7 @@ SDL_GPUShader* debug_vertex_shader=nullptr;
 SDL_GPUGraphicsPipeline* graphics_pipeline = nullptr;
 SDL_GPUGraphicsPipeline* grid_pipeline = nullptr;
 SDL_GPUGraphicsPipeline* geometry_pipeline = nullptr;
+SDL_GPUGraphicsPipeline* debug_light_pipeline = nullptr;
 
 static TestUBO testUBO = {glm::vec4(1.0,0.0,0.0,1.0)};
 
@@ -532,10 +533,9 @@ void Load_GeometryPipeline(SDL_GPUDevice* device) {
 
 void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
 
-    Initialize_GBuffer(device);
 
     size_t vertex_shader_size = 0;
-    void* vertex_code = SDL_LoadFile("../playground/shaders/geometry_vs.spv", &vertex_shader_size);
+    void* vertex_code = SDL_LoadFile("../playground/shaders/debug_light_vs.spv", &vertex_shader_size);
 
     SDL_GPUShaderCreateInfo vertex_shader_info{};
     vertex_shader_info.code = (Uint8*)vertex_code; //convert to an array of bytes
@@ -554,7 +554,7 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
 
 
     size_t fragment_shader_size = 0;
-    void* fragment_code = SDL_LoadFile("../playground/shaders/geometry_fs.spv",&fragment_shader_size);
+    void* fragment_code = SDL_LoadFile("../playground/shaders/debug_light_fs.spv",&fragment_shader_size);
 
     SDL_GPUShaderCreateInfo fragment_shader_info{};
     fragment_shader_info.code = (Uint8*)fragment_code;
@@ -570,9 +570,9 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
     SDL_free(fragment_code);
 
 
-    SDL_GPUGraphicsPipelineCreateInfo geometry_pipeline_info{};
-    geometry_pipeline_info.vertex_shader = geometry_vertex_shader;
-    geometry_pipeline_info.fragment_shader = geometry_fragment_shader;
+    SDL_GPUGraphicsPipelineCreateInfo debug_light_pipeline_info{};
+    debug_light_pipeline_info.vertex_shader = geometry_vertex_shader;
+    debug_light_pipeline_info.fragment_shader = geometry_fragment_shader;
 
     SDL_GPUVertexBufferDescription vertex_buffer_descriptions[2];
 
@@ -584,10 +584,10 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
     vertex_buffer_descriptions[1].slot = 1;
     vertex_buffer_descriptions[1].input_rate = SDL_GPU_VERTEXINPUTRATE_INSTANCE;
     vertex_buffer_descriptions[1].pitch = sizeof(glm::mat4x4);
-    vertex_buffer_descriptions[1].instance_step_rate= 1;
+    vertex_buffer_descriptions[1].instance_step_rate = 1;
 
-    geometry_pipeline_info.vertex_input_state.num_vertex_buffers = 2;
-    geometry_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
+    debug_light_pipeline_info.vertex_input_state.num_vertex_buffers = 2;
+    debug_light_pipeline_info.vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
 
     SDL_GPUVertexAttribute vertex_attributes[9];
     std::uint32_t offset = 0;
@@ -639,28 +639,28 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
     vertex_attributes[8].location = 8;
     vertex_attributes[8].offset = sizeof(float)*12;
 
-    geometry_pipeline_info.vertex_input_state.num_vertex_attributes=9;
-    geometry_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
+    debug_light_pipeline_info.vertex_input_state.num_vertex_attributes=9;
+    debug_light_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
 
-    geometry_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
-    geometry_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
+    debug_light_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    debug_light_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[4];
 
     color_target_descriptions[0] = {};
     color_target_descriptions[0].format = SDL_GPU_TEXTUREFORMAT_R16G16B16A16_UNORM;
 
-    geometry_pipeline_info.target_info.num_color_targets = 1;
+    debug_light_pipeline_info.target_info.num_color_targets = 1;
 
-    geometry_pipeline_info.target_info.color_target_descriptions = color_target_descriptions;
+    debug_light_pipeline_info.target_info.color_target_descriptions = color_target_descriptions;
 
-    geometry_pipeline_info.depth_stencil_state.enable_depth_test = true;
-    geometry_pipeline_info.depth_stencil_state.enable_depth_write = true;
-    geometry_pipeline_info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
-    geometry_pipeline_info.target_info.has_depth_stencil_target = true;
+    debug_light_pipeline_info.depth_stencil_state.enable_depth_test = true;
+    debug_light_pipeline_info.depth_stencil_state.enable_depth_write = true;
+    debug_light_pipeline_info.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    debug_light_pipeline_info.target_info.has_depth_stencil_target = true;
 
-    geometry_pipeline_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
-    geometry_pipeline = SDL_CreateGPUGraphicsPipeline(device,&geometry_pipeline_info);
+    debug_light_pipeline_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
+    geometry_pipeline = SDL_CreateGPUGraphicsPipeline(device,&debug_light_pipeline_info);
 
 }
 
@@ -1323,6 +1323,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     SDL_ReleaseGPUGraphicsPipeline(device,grid_pipeline);
     SDL_ReleaseGPUGraphicsPipeline(device,graphics_pipeline);
     SDL_ReleaseGPUGraphicsPipeline(device, geometry_pipeline);
+    SDL_ReleaseGPUGraphicsPipeline(device, debug_light_pipeline);
 
     SDL_DestroyWindow(window);
     SDL_DestroyGPUDevice(device);
