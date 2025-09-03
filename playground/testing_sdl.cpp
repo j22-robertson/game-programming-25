@@ -96,7 +96,12 @@ std::vector<std::uint32_t> indices_length_storage;
 SDL_GPUBuffer* vertex_buffer;
 SDL_GPUBuffer* index_buffer;
 SDL_GPUBuffer* instance_buffer;
+SDL_GPUBuffer* debug_instance_buffer;
+
+
 SDL_GPUTransferBuffer* instance_transfer_buffer;
+SDL_GPUTransferBuffer* debug_instance_transfer_buffer;
+
 
 SDL_GPUTexture* texture;
 SDL_GPUSampler* sampler;
@@ -110,6 +115,7 @@ std::map<std::string, Model> models;
 std::queue<Model> unloaded_models;
 
 std::vector<Transform> transforms;
+std::vector<Transform> debug_light_transforms;
 
 GraphicsResources graphics_resources;
 
@@ -571,8 +577,8 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
 
 
     SDL_GPUGraphicsPipelineCreateInfo debug_light_pipeline_info{};
-    debug_light_pipeline_info.vertex_shader = geometry_vertex_shader;
-    debug_light_pipeline_info.fragment_shader = geometry_fragment_shader;
+    debug_light_pipeline_info.vertex_shader = debug_vertex_shader;
+    debug_light_pipeline_info.fragment_shader = debug_fragment_shader;
 
     SDL_GPUVertexBufferDescription vertex_buffer_descriptions[2];
 
@@ -642,7 +648,7 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
     debug_light_pipeline_info.vertex_input_state.num_vertex_attributes=9;
     debug_light_pipeline_info.vertex_input_state.vertex_attributes = vertex_attributes;
 
-    debug_light_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    debug_light_pipeline_info.rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
     debug_light_pipeline_info.rasterizer_state.front_face = SDL_GPU_FRONTFACE_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_descriptions[4];
@@ -660,7 +666,10 @@ void Load_DebugLightingPipeline(SDL_GPUDevice* device) {
     debug_light_pipeline_info.target_info.has_depth_stencil_target = true;
 
     debug_light_pipeline_info.target_info.depth_stencil_format = SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT;
-    geometry_pipeline = SDL_CreateGPUGraphicsPipeline(device,&debug_light_pipeline_info);
+    debug_light_pipeline = SDL_CreateGPUGraphicsPipeline(device,&debug_light_pipeline_info);
+
+    //Todo: Create instance buffer for lights based on maximum number of lights
+
 
 }
 
@@ -835,7 +844,6 @@ void Create_InstanceBuffer(SDL_GPUDevice* device) {
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
-  //  SDL_ReleaseGPUTransferBuffer(device,transfer_buffer);
 }
 
 void Update_InstanceBuffer() {
@@ -878,6 +886,99 @@ void Update_InstanceBuffer() {
     SDL_EndGPUCopyPass(copy_pass);
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
+}
+
+void Create_DebugIBuffer(SDL_GPUDevice* device) {
+    SDL_GPUBufferCreateInfo buffer_create_info{};
+
+    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*debug_light_transforms.size();
+
+    const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+    buffer_create_info.size = instance_buffer_size;
+    buffer_create_info.usage = SDL_GPU_BUFFERUSAGE_VERTEX;
+    debug_instance_buffer = SDL_CreateGPUBuffer(device, &buffer_create_info);
+
+    SDL_GPUTransferBufferCreateInfo transfer_buffer_info{};
+    transfer_buffer_info.size = instance_buffer_size;
+    transfer_buffer_info.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    debug_instance_transfer_buffer = SDL_CreateGPUTransferBuffer(device, &transfer_buffer_info);
+
+
+
+    glm::mat4* data = (glm::mat4*)SDL_MapGPUTransferBuffer(device, debug_instance_transfer_buffer, true);
+
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    auto light_model_matrices = std::vector<glm::mat4>();
+
+    for (auto& transform : debug_light_transforms) {
+        light_model_matrices.emplace_back(transform.Get_TransformMatrix());
+    }
+
+    SDL_memcpy(data,light_model_matrices.data(),instance_buffer_size);
+    SDL_UnmapGPUTransferBuffer(device, debug_instance_transfer_buffer);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    SDL_GPUTransferBufferLocation transfer_location{};
+    transfer_location.transfer_buffer = debug_instance_transfer_buffer;
+    transfer_location.offset = 0;
+
+    SDL_GPUBufferRegion buffer_region{};
+    buffer_region.buffer = debug_instance_buffer;
+    buffer_region.size = instance_buffer_size;
+    buffer_region.offset = 0;
+
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
+}
+
+void Update_DebugInstanceBuffer() {
+    //TODO: Change this function to update fixed parts of the instance buffer so that different instances of different models can be rendered with the same binding?
+    //TODO: Make this function work with all transforms that can be rendered within a scene
+
+
+    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*transforms.size();
+
+    const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
+
+
+    glm::mat4* data = (glm::mat4*)SDL_MapGPUTransferBuffer(device, debug_instance_transfer_buffer, true);
+
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    auto model_matrices = std::vector<glm::mat4>();
+
+    for (auto transform : debug_light_transforms) {
+        model_matrices.emplace_back(transform.Get_TransformMatrix());
+    }
+
+    SDL_memcpy(data,model_matrices.data(),instance_buffer_size);
+    SDL_UnmapGPUTransferBuffer(device, debug_instance_transfer_buffer);
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+    SDL_GPUTransferBufferLocation transfer_location{};
+    transfer_location.transfer_buffer = debug_instance_transfer_buffer;
+    transfer_location.offset = 0;
+
+    SDL_GPUBufferRegion buffer_region{};
+    buffer_region.buffer = debug_instance_buffer;
+    buffer_region.size = instance_buffer_size;
+    buffer_region.offset = 0;
+
+    SDL_UploadToGPUBuffer(copy_pass, &transfer_location, &buffer_region, true);
+
+    SDL_EndGPUCopyPass(copy_pass);
+
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 
 }
 
@@ -905,10 +1006,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     directional_light.attenuation_factors.x = 1.0f;
     directional_light.attenuation_factors.y = 0.09f;
     directional_light.attenuation_factors.z = 0.032f;
-    scene_lights.push_back(directional_light);
+    scene_lights.emplace_back(directional_light);
+
+    Transform directional_transform = {};
+    directional_transform.Get_Position() = glm::vec3(directional_light.position.x, directional_light.position.y, directional_light.position.z);
+    directional_transform.Get_Scale() = glm::vec3(10.0f,10.0f,10.0f);
+    directional_transform.Rotate(glm::vec3(0.0,0.0,1.0),1.0);
+
+    debug_light_transforms.emplace_back(directional_transform);
 
     Light spotlight = {};
-    spotlight.position = glm::vec4(0.1,3.0,0.1,2.0);
+    spotlight.position = glm::vec4(0.1,0.1,0.1,2.0);
     spotlight.ambient = glm::vec4(1.0,1.0,1.0,0.0);
     spotlight.specular = glm::vec4(1.0,0.0,1.0,0.0);
     spotlight.diffuse = glm::vec4(1.0,0.0,1.0,0.0);
@@ -921,6 +1029,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     scene_lights.push_back(spotlight);
 
 
+    Transform spotlight_transform = {};
+    spotlight_transform.Get_Position() = glm::vec3(spotlight.position.x, spotlight.position.y, spotlight.position.z);
+    spotlight_transform.Get_Scale() = glm::vec3(1.0f,1.0f,1.0f);
+    spotlight_transform.Rotate(glm::vec3(0.0,0.0,1.0),1.0);
+
+    debug_light_transforms.emplace_back(spotlight_transform);
+
 
     SDL_GPUTextureCreateInfo depth_texture_info = {};
     depth_texture_info.width = 960.0f;
@@ -931,8 +1046,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
    depth_texture_info.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
     depth_texture = SDL_CreateGPUTexture(device, &depth_texture_info);
 
+
+
+    Create_DebugIBuffer(device);
+    Update_DebugInstanceBuffer();
+
+    Load_DebugLightingPipeline(device);
    // Mesh_UploadToGPU(device, cube_vertices,cube_indices);
 
+    //Load models n stuff below
     SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
 
     DEBUG_TEXTURE = Load_DebugTexture(device);
@@ -943,24 +1065,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
         command_buffer ,
         "../playground/Models/ornate_mirror/scene.gltf",
         graphics_resources);
+
+
+
+    //End of uploads
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
     models.insert(std::pair("MIRROR",model));
-/*
-    while (!unloaded_models.empty()) {
-        auto unloaded_model = unloaded_models.front();
-        for (auto& mesh : unloaded_model.mesh_storage) {
-           // Mesh_UploadToGPU(device,command_buffer,graphics_resources,mesh);
-        }
-        unloaded_models.pop();
-        models.insert(std::pair("CUBE",unloaded_model));
-    }*/
 
-
-
-    //Load_Texture2DFromFile(device,"../playground/Textures/red-clay-wall-albedo.png" );
-
-   // Load_Texture2DFromFile(device,"../playground/Models/ornate_mirror/textures/Mirror_material_baseColor.jpeg" );
     size_t vertex_shader_size = 0;
     void* vertex_code = SDL_LoadFile("../playground/shaders/deferred_vs.spv", &vertex_shader_size);
 
@@ -1132,9 +1244,31 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_SetGPUScissor(geometry_pass,&scissor);
     SDL_SetGPUViewport(geometry_pass,&viewport);
 
+    SDL_BindGPUGraphicsPipeline(geometry_pass, debug_light_pipeline);
+    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
+
+    for (const auto& mesh : models["DEBUG"].mesh_storage)
+    {
+        SDL_GPUBufferBinding buffer_bindings[2];
+        buffer_bindings[0].buffer = graphics_resources.vertex_buffer_map.Get_Resource(mesh.v_buffer_id)->Get_GPUBuffer();
+        buffer_bindings[0].offset = 0;
+        buffer_bindings[1].buffer = debug_instance_buffer;
+        buffer_bindings[1].offset = 0;
+
+        SDL_GPUBufferBinding ib_buffer_bindings[1];
+        ib_buffer_bindings[0].buffer = graphics_resources.index_buffer_map.Get_Resource(mesh.i_buffer_id)->Get_GPUBuffer();
+        ib_buffer_bindings[0].offset=0;
+
+        SDL_BindGPUVertexBuffers(geometry_pass,0,buffer_bindings,2);
+        SDL_BindGPUIndexBuffer(geometry_pass, ib_buffer_bindings, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+        SDL_DrawGPUIndexedPrimitives(geometry_pass,mesh.indices.size(),debug_light_transforms.size(),0,0,0);
+    }
+
     SDL_BindGPUGraphicsPipeline(geometry_pass,grid_pipeline);
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform, sizeof(CameraUniform));
     SDL_DrawGPUPrimitives(geometry_pass,6,1,0,0);
+
 
     SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
 
@@ -1302,6 +1436,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
 
     SDL_ReleaseGPUBuffer(device,instance_buffer);
+    SDL_ReleaseGPUBuffer(device,debug_instance_buffer);
 
     SDL_ReleaseGPUTransferBuffer(device,instance_transfer_buffer);
 
