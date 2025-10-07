@@ -123,13 +123,13 @@ void main()
         Light light = lights[i];
         vec3 light_direction = normalize(light.position.xyz - fragment_position);
         vec3 half_way = normalize(light_direction + view_direction);
-
+        light_output += CalculatePointLight(light, normal, view_direction, fragment_position, 32.0);
         if (light.position.w == 0)
         {
-           light_output += CalculateDirectional(light, normal, view_direction, 8.0);
+            //light_output += CalculateDirectional(light, normal, view_direction, 8.0);
         }
         else {
-          light_output += CalculatePointLight(light, normal, view_direction, fragment_position, 32.0);
+
         }/*
         switch(light.type){
             case 0:

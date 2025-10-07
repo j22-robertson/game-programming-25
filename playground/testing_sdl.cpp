@@ -943,8 +943,7 @@ void Update_DebugInstanceBuffer() {
     //TODO: Change this function to update fixed parts of the instance buffer so that different instances of different models can be rendered with the same binding?
     //TODO: Make this function work with all transforms that can be rendered within a scene
 
-
-    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*transforms.size();
+    const std::uint32_t instance_buffer_size = sizeof(glm::mat4)*debug_light_transforms.size();
 
     const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
 
@@ -993,7 +992,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
 
     //Mesh_UploadToGPU(device, square_vertices, indices);
-
+/*
 
     Light directional_light = {};
     directional_light.position= glm::vec4(3.0,9.0,3.0,0.0);
@@ -1007,16 +1006,16 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     directional_light.attenuation_factors.y = 0.09f;
     directional_light.attenuation_factors.z = 0.032f;
     scene_lights.emplace_back(directional_light);
+*/
+    //Transform directional_transform = {};
+    //directional_transform.Get_Position() = glm::vec3(directional_light.position.x, directional_light.position.y, directional_light.position.z);
+    //directional_transform.Get_Scale() = glm::vec3(10.0f,10.0f,10.0f);
+    //directional_transform.Rotate(glm::vec3(0.0,0.0,1.0),1.0);
 
-    Transform directional_transform = {};
-    directional_transform.Get_Position() = glm::vec3(directional_light.position.x, directional_light.position.y, directional_light.position.z);
-    directional_transform.Get_Scale() = glm::vec3(10.0f,10.0f,10.0f);
-    directional_transform.Rotate(glm::vec3(0.0,0.0,1.0),1.0);
-
-    debug_light_transforms.emplace_back(directional_transform);
+    //debug_light_transforms.emplace_back(directional_transform);
 
     Light spotlight = {};
-    spotlight.position = glm::vec4(0.1,0.1,0.1,2.0);
+    spotlight.position = glm::vec4(1,5,3,1.0);
     spotlight.ambient = glm::vec4(1.0,1.0,1.0,0.0);
     spotlight.specular = glm::vec4(1.0,0.0,1.0,0.0);
     spotlight.diffuse = glm::vec4(1.0,0.0,1.0,0.0);
@@ -1031,8 +1030,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     Transform spotlight_transform = {};
     spotlight_transform.Get_Position() = glm::vec3(spotlight.position.x, spotlight.position.y, spotlight.position.z);
-    spotlight_transform.Get_Scale() = glm::vec3(1.0f,1.0f,1.0f);
-    spotlight_transform.Rotate(glm::vec3(0.0,0.0,1.0),1.0);
+    spotlight_transform.Get_Scale() = glm::vec3(.5f,0.5f,0.5f);
+    spotlight_transform.Rotate(glm::vec3(0.0,90.0,1.0),1.0);
 
     debug_light_transforms.emplace_back(spotlight_transform);
 
@@ -1058,16 +1057,15 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(device);
 
     DEBUG_TEXTURE = Load_DebugTexture(device);
+
     Model debug_light_model = Load_ModelFromFileWithTexture(device,command_buffer,"../playground/Models/cubic.obj",graphics_resources,DEBUG_TEXTURE);
 
     models.insert(std::pair("DEBUG",debug_light_model));
+
     Model model = Load_ModelDataFromFile(device,
         command_buffer ,
         "../playground/Models/ornate_mirror/scene.gltf",
         graphics_resources);
-
-
-
     //End of uploads
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
@@ -1244,6 +1242,14 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_SetGPUScissor(geometry_pass,&scissor);
     SDL_SetGPUViewport(geometry_pass,&viewport);
 
+
+    SDL_BindGPUGraphicsPipeline(geometry_pass,grid_pipeline);
+    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform, sizeof(CameraUniform));
+    SDL_DrawGPUPrimitives(geometry_pass,6,1,0,0);
+
+
+
+
     SDL_BindGPUGraphicsPipeline(geometry_pass, debug_light_pipeline);
     SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform,sizeof(CameraUniform));
 
@@ -1264,11 +1270,6 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
         SDL_DrawGPUIndexedPrimitives(geometry_pass,mesh.indices.size(),debug_light_transforms.size(),0,0,0);
     }
-
-    SDL_BindGPUGraphicsPipeline(geometry_pass,grid_pipeline);
-    SDL_PushGPUVertexUniformData(command_buffer,0,&camera_uniform, sizeof(CameraUniform));
-    SDL_DrawGPUPrimitives(geometry_pass,6,1,0,0);
-
 
     SDL_BindGPUGraphicsPipeline(geometry_pass,geometry_pipeline);
 
