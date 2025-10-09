@@ -29,17 +29,59 @@ enum LightType : std::int32_t {
     INVALID_LIGHT = std::numeric_limits<std::int32_t>::max(),
 };
 
-struct Light {
+class Light {
+public:
+    glm::vec3 Position() const {return glm::vec3{position.x, position.y, position.z};}
+    void Position(const glm::vec3 _position) {position = glm::vec4{_position,1.0f};}
+
+    const glm::vec4& Ambient() const {return ambient;}
+    void Ambient(const glm::vec4 _ambient){ambient=_ambient;}
+
+    const glm::vec4& Diffuse() const {return diffuse;}
+    void Diffuse(const glm::vec4 _diffuse){diffuse = _diffuse;}
+
+    const glm::vec4& Specular() const {return specular;}
+    void Specular(const glm::vec4 _specular){specular = _specular;}
+
+
+
+
+
+
+
+protected:
     glm::vec4 position= glm::vec4(0.0f);
     glm::vec4 ambient = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
     glm::vec4 diffuse = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
     glm::vec4 specular = glm::vec4(1.0f, 1.0f, 1.0f,0.0);
-    glm::vec4 direction = glm::vec4(0.0f, 0.0f, 0.0f,0.0);
-    glm::vec4 attenuation_factors= glm::vec4(1.0f, 0.09f, 0.032f,0.0);
+    glm::vec4 direction = glm::vec4(0.0f, 0.0f, 0.0f,0.0f);
+    glm::vec4 attenuation_factors= glm::vec4(1.0f, 0, 0.0f,0.0);
     glm::vec4 spotlight_parameters = glm::vec4(0);
 };
 
+class DirectionalLight : public Light {
+public:
+    const glm::vec3 Direction() const {return glm::vec3{direction.x, direction.y, direction.z};}
+    void Direction(const glm::vec3 _direction){direction=glm::vec4{_direction,0.0f};}
+};
 
+class PointLight : public Light {
+    public:
+    float LinearAttenuation() const {return attenuation_factors.y;}
+    void LinearAttenuation(const float attenuation){attenuation_factors.y = attenuation;}
+
+    float QuadraticAttenuation() const {return attenuation_factors.x;}
+    void QuadraticAttenuation(const float attenuation){attenuation_factors.x = attenuation;}
+};
+
+class SpotLight : public Light {
+public:
+    float InnerCutoff() const {return spotlight_parameters.x;}
+    void InnerCutoff(const float cutoff){spotlight_parameters.x = cutoff;}
+
+    float OuterCutoff() const {return spotlight_parameters.y;}
+    void OuterCutoff(const float cutoff){spotlight_parameters.y = cutoff;}
+};
 
 constexpr std::uint32_t INVALID_ID = std::numeric_limits<std::uint32_t>::max();
 

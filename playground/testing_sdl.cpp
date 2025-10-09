@@ -856,7 +856,7 @@ void Update_InstanceBuffer() {
     const auto command_buffer = SDL_AcquireGPUCommandBuffer(device);
 
 
-    glm::mat4* data = (glm::mat4*)SDL_MapGPUTransferBuffer(device, instance_transfer_buffer, true);
+    glm::mat4* data = static_cast<glm::mat4 *>(SDL_MapGPUTransferBuffer(device, instance_transfer_buffer, true));
 
 
     SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
@@ -1014,22 +1014,21 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     //debug_light_transforms.emplace_back(directional_transform);
 
-    Light spotlight = {};
-    spotlight.position = glm::vec4(1,5,3,1.0);
-    spotlight.ambient = glm::vec4(1.0,1.0,1.0,0.0);
-    spotlight.specular = glm::vec4(1.0,0.0,1.0,0.0);
-    spotlight.diffuse = glm::vec4(1.0,0.0,1.0,0.0);
-    spotlight.direction = glm::vec4(1.0,1.0,1.0,0.0);
-    spotlight.spotlight_parameters.x= glm::cos(glm::radians(12.5f));
-    spotlight.spotlight_parameters.y = glm::cos(glm::radians(17.0f));
-    spotlight.attenuation_factors.x = 1.0f;
-    spotlight.attenuation_factors.y = 0.09f;
-    spotlight.attenuation_factors.z = 0.032f;
+    PointLight spotlight = {};
+    spotlight.Position(glm::vec3(1,5,3));
+    spotlight.Ambient(glm::vec4(1.0,1.0,1.0,0.0));
+    spotlight.Specular( glm::vec4(1.0,0.0,1.0,0.0));
+    spotlight.Diffuse(glm::vec4(1.0,1.0,1.0,0.0));
+    //spotlight.Direction(glm::vec3(1.0,1.0,1.0));
+    //spotlight.InnerCutoff(glm::cos(glm::radians(12.5f)));
+    //spotlight.OuterCutoff(glm::cos(glm::radians(17.0f)));
+    spotlight.LinearAttenuation(0.09f);
+    spotlight.QuadraticAttenuation(0.032f);
     scene_lights.push_back(spotlight);
 
 
     Transform spotlight_transform = {};
-    spotlight_transform.Get_Position() = glm::vec3(spotlight.position.x, spotlight.position.y, spotlight.position.z);
+    spotlight_transform.Get_Position() = glm::vec3(spotlight.Position().x, spotlight.Position().y, spotlight.Position().z);
     spotlight_transform.Get_Scale() = glm::vec3(.5f,0.5f,0.5f);
     spotlight_transform.Rotate(glm::vec3(0.0,90.0,1.0),1.0);
 
